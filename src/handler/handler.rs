@@ -422,6 +422,20 @@ mod tests {
             connection_timeout_secs: 30,
             max_connections: 1000,
             enable_health_check: true,
+            enable_cors: true,
+            cors_allowed_origins: vec!["*".to_string()],
+            cors_allowed_methods: vec!["GET".to_string()],
+            cors_allowed_headers: vec![],
+            cors_allow_credentials: false,
+            cors_exposed_headers: vec![],
+            cors_max_age: Some(86400),
+            enable_security: true,
+            rate_limit_max_requests: 100,
+            rate_limit_window_secs: 60,
+            ip_allowlist: vec![],
+            ip_blocklist: vec![],
+            max_body_size: 10 * 1024 * 1024,
+            max_headers: 100,
         });
         let handler = Handler::new(config);
 

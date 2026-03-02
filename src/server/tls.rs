@@ -3,7 +3,7 @@
 //! This module provides TLS configuration and utilities for HTTPS connections.
 
 use crate::error::{Error, Result};
-use rustls::{ServerConfig, pki_types};
+use rustls::ServerConfig;
 use rustls_pemfile::{certs, private_key};
 use std::fs::File;
 use std::io::BufReader;
