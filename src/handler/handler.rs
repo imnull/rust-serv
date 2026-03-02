@@ -1,12 +1,12 @@
 use crate::error::Error;
 use crate::file_service::{FileService, FileMetadata};
-use crate::handler::RangeRequest;
+use crate::handler::{RangeRequest, CompressionType, compress, parse_accept_encoding, should_skip_compression};
 use crate::mime_types::MimeDetector;
 use crate::path_security::PathValidator;
 use crate::utils::format_bytes;
 use crate::Config;
 use http_body_util::Full;
-use hyper::{Request, Response};
+use hyper::{Request, Response, header};
 use hyper::body::{Bytes, Incoming};
 use std::convert::Infallible;
 use std::path::PathBuf;
@@ -70,6 +70,13 @@ impl Handler {
         let if_none_match = req.headers().get("If-None-Match")
             .and_then(|v| v.to_str().ok());
 
+        // Determine compression preference
+        let compression_type = if self.config.enable_compression {
+            parse_accept_encoding(req.headers())
+        } else {
+            CompressionType::None
+        };
+
         match FileService::read_file(path) {
             Ok(content) => {
                 let file_size = content.len() as u64;
@@ -94,6 +101,7 @@ impl Handler {
 
                 // Handle range request
                 if let Some(range_header) = range_header {
+                    // Range requests are not compressed
                     match RangeRequest::parse(range_header, file_size) {
                         Ok(Some(range)) => {
                             // Return 206 Partial Content
@@ -118,17 +126,17 @@ impl Handler {
                                 .unwrap());
                         }
                         Ok(None) => {
-                            // Invalid range, return full content
-                            return Ok(self.serve_file_with_etag(path, content, etag));
+                            // Invalid range, return full content with compression
+                            return Ok(self.serve_file_with_etag(path, content, etag, compression_type));
                         }
                         Err(_) => {
-                            // Parse error, return full content
-                            return Ok(self.serve_file_with_etag(path, content, etag));
+                            // Parse error, return full content with compression
+                            return Ok(self.serve_file_with_etag(path, content, etag, compression_type));
                         }
                     }
                 } else {
-                    // No range header, return full content
-                    Ok(self.serve_file_with_etag(path, content, etag))
+                    // No range header, return full content with compression
+                    Ok(self.serve_file_with_etag(path, content, etag, compression_type))
                 }
             }
             Err(Error::NotFound(_)) => Ok(self.serve_not_found()),
@@ -172,19 +180,58 @@ impl Handler {
             .unwrap_or_else(|_| "Thu, 01 Jan 1970 00:00:00 GMT".to_string())
     }
 
-    fn serve_file_with_etag(&self, path: &PathBuf, content: Vec<u8>, etag: String) -> Response<Full<Bytes>> {
+    fn serve_file_with_etag(&self, path: &PathBuf, content: Vec<u8>, etag: String, compression_type: CompressionType) -> Response<Full<Bytes>> {
         let mime = MimeDetector::detect(path);
+        let content_type = mime.to_string();
+
+        // Determine if we should compress this content
+        let (final_content, content_encoding) = if compression_type != CompressionType::None
+            && !should_skip_compression(&content_type) {
+            match compress(&content, compression_type) {
+                Ok(compressed) => {
+                    // Use compressed content
+                    if compressed.len() < content.len() {
+                        // Compression was beneficial
+                        (compressed, Some(compression_type))
+                    } else {
+                        // Compression didn't help, use original
+                        (content, None)
+                    }
+                }
+                Err(_) => {
+                    // Compression failed, use original content
+                    (content, None)
+                }
+            }
+        } else {
+            // No compression or compression should be skipped
+            (content, None)
+        };
+
         let last_modified = self.generate_last_modified(path);
-        Response::builder()
+
+        // Build response
+        let mut builder = Response::builder()
             .status(200)
-            .header("Content-Type", mime.to_string())
-            .header("Content-Length", content.len().to_string())
+            .header("Content-Type", content_type)
+            .header("Content-Length", final_content.len().to_string())
             .header("Accept-Ranges", "bytes")
             .header("ETag", etag)
             .header("Last-Modified", last_modified)
-            .header("Cache-Control", "public, max-age=86400")
-            .body(Full::new(Bytes::from(content)))
-            .unwrap()
+            .header("Cache-Control", "public, max-age=86400");
+
+        // Add Content-Encoding header if compression was applied
+        if let Some(encoding) = content_encoding {
+            let encoding_value = match encoding {
+                CompressionType::Gzip => "gzip",
+                CompressionType::Brotli => "br",
+                CompressionType::None => unreachable!(),
+            };
+            builder = builder.header(header::CONTENT_ENCODING, encoding_value);
+            builder = builder.header(header::VARY, "Accept-Encoding");
+        }
+
+        builder.body(Full::new(Bytes::from(final_content))).unwrap()
     }
 
     fn serve_not_found(&self) -> Response<Full<Bytes>> {
@@ -396,7 +443,7 @@ mod tests {
         let content = std::fs::read(&test_file).unwrap();
         let etag = handler.generate_etag(&test_file, content.len() as u64);
         let etag_clone = etag.clone();
-        let response = handler.serve_file_with_etag(&test_file, content, etag);
+        let response = handler.serve_file_with_etag(&test_file, content, etag, CompressionType::None);
 
         assert_eq!(response.status(), 200);
         assert_eq!(response.headers().get("ETag").unwrap().to_str().unwrap(), etag_clone);
@@ -495,7 +542,7 @@ mod tests {
 
         let content = std::fs::read(&test_file).unwrap();
         let etag = handler.generate_etag(&test_file, content.len() as u64);
-        let response = handler.serve_file_with_etag(&test_file, content, etag);
+        let response = handler.serve_file_with_etag(&test_file, content, etag, CompressionType::None);
 
         assert!(response.headers().get("Content-Type").is_some());
         assert!(response.headers().get("Content-Length").is_some());

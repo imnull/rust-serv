@@ -9,6 +9,7 @@
 - ✅ **路径安全** - 防止路径遍历攻击
 - ✅ **MIME 类型检测** - 自动检测文件类型
 - ✅ **配置系统** - 灵活的 TOML 配置
+- ✅ **HTTP 压缩** - 支持 Gzip 和 Brotli 压缩
 - ✅ **TDD 开发** - 完整的测试覆盖
 
 ## 快速开始
@@ -44,6 +45,34 @@ root = "./public"
 enable_indexing = true
 enable_compression = true
 log_level = "info"
+```
+
+### HTTP 压缩
+
+服务器支持响应内容压缩，可以显著减少带宽使用和加快传输速度。
+
+**支持的压缩算法:**
+- Gzip: 广泛支持，压缩效率良好
+- Brotli: 更高的压缩率，现代浏览器支持
+
+**压缩策略:**
+- 基于客户端 `Accept-Encoding` 头自动选择最佳算法
+- 自动跳过已压缩内容（图片、视频、音频等）
+- 智能判断：仅在压缩能显著减少大小时启用
+- 范围请求不压缩（避免破坏分片传输）
+
+**配置选项:**
+```toml
+enable_compression = true  # 启用压缩
+```
+
+**客户端示例:**
+```bash
+# 使用 curl 测试压缩
+curl -H "Accept-Encoding: gzip" http://localhost:8080/file.txt -I
+
+# 使用 curl 请求 brotli 压缩
+curl -H "Accept-Encoding: br, gzip" http://localhost:8080/file.txt -I
 ```
 
 ## 开发
@@ -121,7 +150,7 @@ rust-serv/
 - ✅ 路径安全 (防止目录遍历)
 - ✅ 配置系统
 - ✅ 范围请求 (HTTP Range 支持，返回 206 Partial Content)
-- 🔨 压缩支持 (中间件框架完成，实际压缩待实现)
+- ✅ 压缩支持 (Gzip 和 Brotli 压缩，基于 Accept-Encoding 头)
 - ✅ ETag 和缓存 (ETag 生成，If-None-Match 验证，304 响应)
 
 ## 性能
@@ -193,7 +222,7 @@ rust-serv/
 
 - [x] 范围请求支持
 - [x] 日志集成
-- [ ] 压缩优化
+- [x] 压缩优化
 - [ ] 性能测试
 
 ### v0.3.0
