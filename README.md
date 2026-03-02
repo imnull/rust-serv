@@ -75,6 +75,31 @@ curl -H "Accept-Encoding: gzip" http://localhost:8080/file.txt -I
 curl -H "Accept-Encoding: br, gzip" http://localhost:8080/file.txt -I
 ```
 
+### 性能基准测试
+
+项目包含完整的性能基准测试套件，使用 Criterion 框架构建。
+
+**运行基准测试:**
+```bash
+# 运行所有基准测试
+cargo bench
+
+# 运行特定基准测试组
+cargo bench -- bench_file_service
+cargo bench -- bench_gzip_compression
+```
+
+**基准测试类别:**
+- 文件服务性能 (不同大小的文件读取)
+- 压缩性能 (Gzip 和 Brotli，不同数据模式)
+- 路径验证性能 (安全检查速度)
+- MIME 类型检测性能 (类型识别速度)
+- 压缩决策性能 (内容过滤逻辑)
+- ETag 生成性能 (缓存标识符生成)
+- 目录列表性能 (不同规模的目录遍历)
+
+详细的性能测试文档请参见 [docs/performance.md](docs/performance.md)。
+
 ## 开发
 
 ### 运行测试
@@ -116,6 +141,7 @@ rust-serv/
 ├── docs/
 │   ├── requirements.md      # 需求文档
 │   ├── technical-design.md  # 技术文档
+│   ├── performance.md      # 性能测试文档
 │   └── api.md             # API 文档
 ├── src/
 │   ├── main.rs            # 程序入口
@@ -130,6 +156,8 @@ rust-serv/
 │   └── utils/             # 工具
 ├── tests/
 │   └── integration_test.rs  # 集成测试
+├── benches/
+│   └── performance.rs    # 性能基准测试
 └── examples/
     └── config.toml       # 配置示例
 ```
@@ -223,7 +251,7 @@ rust-serv/
 - [x] 范围请求支持
 - [x] 日志集成
 - [x] 压缩优化
-- [ ] 性能测试
+- [x] 性能测试
 
 ### v0.3.0
 
