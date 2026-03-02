@@ -29,6 +29,7 @@ impl<S> Layer<S> for CompressionLayer {
 #[derive(Clone)]
 pub struct CompressionService<S> {
     inner: S,
+    #[allow(dead_code)]
     enabled: bool,
 }
 

@@ -33,7 +33,7 @@ async fn test_etag_mismatch_returns_200() {
     let response1 = client.get(&url).send().await.unwrap();
     assert_eq!(response1.status(), StatusCode::OK);
 
-    let etag = response1.headers().get("ETag")
+    let _etag = response1.headers().get("ETag")
         .and_then(|v| v.to_str().ok())
         .unwrap();
 

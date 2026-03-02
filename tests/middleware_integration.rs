@@ -151,6 +151,12 @@ async fn test_config_options() {
         enable_indexing: true,
         enable_compression: true,
         log_level: "debug".into(),
+        enable_tls: false,
+        tls_cert: None,
+        tls_key: None,
+        connection_timeout_secs: 30,
+        max_connections: 1000,
+        enable_health_check: true,
     };
 
     assert_eq!(custom_config.port, 3000);

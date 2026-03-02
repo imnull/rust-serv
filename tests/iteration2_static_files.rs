@@ -3,7 +3,6 @@ use std::fs;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::net::TcpListener;
-use tokio::time::timeout;
 use rust_serv::{Config, Server};
 
 /// Test helper to start a server on a random port

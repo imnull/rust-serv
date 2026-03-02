@@ -1,5 +1,4 @@
 use crate::error::{Error, Result};
-use std::ops::Range;
 
 /// HTTP Range header parsed result
 #[derive(Debug, Clone, PartialEq)]

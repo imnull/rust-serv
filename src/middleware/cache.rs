@@ -43,8 +43,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_cache_layer() {
         // Test in integration tests

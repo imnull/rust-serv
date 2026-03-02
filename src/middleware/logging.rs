@@ -42,9 +42,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use hyper::body::Incoming;
-
     #[test]
     fn test_logging_layer() {
         // Test in integration tests

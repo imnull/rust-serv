@@ -76,12 +76,10 @@ impl Handler {
 
                 // Generate ETag and Last-Modified based on file size and modification time
                 let etag = self.generate_etag(path, file_size);
-                let last_modified = self.generate_last_modified(path);
 
                 // If-None-Match validation
                 if let Some(if_none_match) = if_none_match {
                     if if_none_match == etag {
-                        let _last_modified = self.generate_last_modified(path);
                         // ETag matches, return 304 Not Modified
                         let last_modified = self.generate_last_modified(path);
                         return Ok(Response::builder()
@@ -159,9 +157,18 @@ impl Handler {
             .and_then(|m| m.modified())
             .unwrap_or(SystemTime::UNIX_EPOCH);
 
-        let datetime: std::time::OffsetDateTime::from(modified);
+        let duration = modified
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default();
+
+        let datetime = time::OffsetDateTime::from_unix_timestamp(duration.as_secs() as i64)
+            .unwrap_or(time::OffsetDateTime::UNIX_EPOCH);
+
+        // Manual formatting for RFC 2822
+        let format = time::format_description::parse("[weekday repr:short], [day] [month repr:short] [year] [hour]:[minute]:[second] GMT")
+            .expect("Invalid format description");
         datetime
-            .format(&std::time::format_description::well_known::Rfc2822)
+            .format(&format)
             .unwrap_or_else(|_| "Thu, 01 Jan 1970 00:00:00 GMT".to_string())
     }
 

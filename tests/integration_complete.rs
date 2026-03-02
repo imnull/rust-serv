@@ -40,7 +40,7 @@ async fn test_static_files_with_compression() {
     assert_eq!(response.status(), StatusCode::OK);
 
     // Check for Content-Encoding header
-    let encoding = response.headers().get("Content-Encoding")
+    let _encoding = response.headers().get("Content-Encoding")
         .and_then(|v| v.to_str().ok());
 
     // Note: Compression not yet implemented, so we verify basic file serving
