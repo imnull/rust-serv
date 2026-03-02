@@ -10,6 +10,7 @@
 - ✅ **MIME 类型检测** - 自动检测文件类型
 - ✅ **配置系统** - 灵活的 TOML 配置
 - ✅ **HTTP 压缩** - 支持 Gzip 和 Brotli 压缩
+- ✅ **HTTPS/TLS 支持** - 安全加密连接
 - ✅ **TDD 开发** - 完整的测试覆盖
 
 ## 快速开始
@@ -142,12 +143,14 @@ rust-serv/
 │   ├── requirements.md      # 需求文档
 │   ├── technical-design.md  # 技术文档
 │   ├── performance.md      # 性能测试文档
+│   ├── tls.md            # TLS/HTTPS 配置文档
 │   └── api.md             # API 文档
 ├── src/
 │   ├── main.rs            # 程序入口
 │   ├── lib.rs             # 库根
 │   ├── config/            # 配置模块
 │   ├── server/            # 服务器核心
+│   │   └── tls.rs       # TLS 配置和加载
 │   ├── handler/           # 请求处理
 │   ├── file_service/      # 文件服务
 │   ├── path_security/     # 路径安全
@@ -159,7 +162,8 @@ rust-serv/
 ├── benches/
 │   └── performance.rs    # 性能基准测试
 └── examples/
-    └── config.toml       # 配置示例
+    ├── config.toml       # 基础配置示例
+    └── https-config.toml  # HTTPS/TLS 配置示例
 ```
 
 ## 测试
@@ -256,7 +260,7 @@ rust-serv/
 ### v0.3.0
 
 - [x] ETag 和缓存
-- [ ] TLS 支持
+- [x] TLS 支持
 - [x] 中间件系统集成
 
 ### 未来

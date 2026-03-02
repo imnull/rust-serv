@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::error::Result;
 use crate::handler::Handler;
+use crate::server::tls::{load_tls_config, validate_tls_config};
 use hyper::server::conn::http1;
 use hyper::Response;
 use hyper::body::Bytes;
@@ -55,6 +56,27 @@ impl Server {
         // Create connection semaphore for max connections
         let max_connections = Arc::new(tokio::sync::Semaphore::new(self.config.max_connections));
 
+        // Setup TLS if enabled
+        let tls_config = if self.config.enable_tls {
+            let cert_path = self.config.tls_cert.as_ref().ok_or_else(|| {
+                crate::error::Error::Internal("tls_cert must be specified when enable_tls is true".to_string())
+            })?;
+            let key_path = self.config.tls_key.as_ref().ok_or_else(|| {
+                crate::error::Error::Internal("tls_key must be specified when enable_tls is true".to_string())
+            })?;
+
+            // Validate TLS configuration
+            validate_tls_config(Some(cert_path), Some(key_path))?;
+
+            let cert_path = std::path::Path::new(cert_path);
+            let key_path = std::path::Path::new(key_path);
+
+            // Load TLS configuration
+            Some(load_tls_config(&cert_path, &key_path)?.clone())
+        } else {
+            None
+        };
+
         loop {
             tokio::select! {
                 // Accept new connection
@@ -72,23 +94,34 @@ impl Server {
                         }
                     };
 
-                    let io = TokioIo::new(stream);
-                    let handler = handler.clone();
+                    let handler = Arc::new(handler.clone());
                     let config = self.config.clone();
+                    let tls_config_clone = tls_config.clone();
 
                     tokio::task::spawn(async move {
                         // Set connection timeout
                         let timeout = Duration::from_secs(config.connection_timeout_secs);
+
                         let result = tokio::time::timeout(timeout, async {
-                            http1::Builder::new()
-                                .serve_connection(io, hyper::service::service_fn(move |req| {
-                                    // Health check endpoint and regular requests
-                                    let handler = handler.clone();
-                                    async move {
-                                        handler.handle_request(req).await
+                            // Handle TLS or plain connection
+                            if let Some(tls_config) = tls_config_clone {
+                                // TLS connection
+                                let tls_acceptor = tokio_rustls::TlsAcceptor::from(tls_config);
+                                let tls_stream = match tls_acceptor.accept(stream).await {
+                                    Ok(stream) => stream,
+                                    Err(e) => {
+                                        eprintln!("TLS handshake failed: {}", e);
+                                        return;
                                     }
-                                }))
-                                .await
+                                };
+
+                                let io = TokioIo::new(tls_stream);
+                                Self::serve_connection(io, handler).await;
+                            } else {
+                                // Plain HTTP connection
+                                let io = TokioIo::new(stream);
+                                Self::serve_connection(io, handler).await;
+                            }
                         }).await;
 
                         match result {
@@ -117,6 +150,24 @@ impl Server {
 
         println!("Server shutdown complete");
         Ok(())
+    }
+
+    /// Serve a single HTTP connection
+    async fn serve_connection<Io: hyper::rt::Read + hyper::rt::Write + Unpin>(
+        io: Io,
+        handler: Arc<Handler>,
+    ) {
+        let handler = handler.clone();
+
+        http1::Builder::new()
+            .serve_connection(io, hyper::service::service_fn(move |req| {
+                let handler = handler.clone();
+                async move {
+                    handler.handle_request(req).await
+                }
+            }))
+            .await
+            .ok(); // Ignore connection errors
     }
 
     /// Shutdown the server
@@ -196,5 +247,27 @@ mod tests {
         let server = Server::new(config);
         // Should not panic
         server.shutdown();
+    }
+
+    #[test]
+    fn test_server_with_tls_config() {
+        let config = Config {
+            port: 443,
+            root: "/var/www".into(),
+            enable_indexing: true,
+            enable_compression: true,
+            log_level: "info".into(),
+            enable_tls: true,
+            tls_cert: Some("/path/to/cert.pem".to_string()),
+            tls_key: Some("/path/to/key.pem".to_string()),
+            connection_timeout_secs: 30,
+            max_connections: 1000,
+            enable_health_check: true,
+        };
+        let server = Server::new(config);
+        assert_eq!(server.config.port, 443);
+        assert!(server.config.enable_tls);
+        assert_eq!(server.config.tls_cert, Some("/path/to/cert.pem".to_string()));
+        assert_eq!(server.config.tls_key, Some("/path/to/key.pem".to_string()));
     }
 }
