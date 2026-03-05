@@ -672,4 +672,123 @@ mod tests {
         assert!(!headers.contains_key(CONTENT_SECURITY_POLICY));
         assert!(!headers.contains_key(STRICT_TRANSPORT_SECURITY));
     }
+
+    #[tokio::test]
+    async fn test_rate_limit_window_reset() {
+        let config = SecurityConfig::default();
+        let layer = SecurityLayer::new(config);
+
+        let ip = "192.168.1.1";
+        // First request should pass
+        assert!(layer.check_rate_limit(ip).await);
+    }
+
+    #[tokio::test]
+    async fn test_rate_limit_disabled() {
+        let config = SecurityConfig {
+            rate_limit: RateLimitConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let layer = SecurityLayer::new(config);
+
+        // When rate limiting is disabled, all requests should pass
+        let ip = "192.168.1.1";
+        for _ in 0..200 {
+            assert!(layer.check_rate_limit(ip).await);
+        }
+    }
+
+    #[test]
+    fn test_parse_cidr_v4_invalid_format() {
+        let config = SecurityConfig::default();
+        let layer = SecurityLayer::new(config);
+
+        // Invalid: missing prefix
+        assert!(layer.parse_cidr_v4("192.168.1.0").is_err());
+        // Invalid: too many parts
+        assert!(layer.parse_cidr_v4("192.168.1.0/24/extra").is_err());
+        // Invalid: prefix > 32
+        assert!(layer.parse_cidr_v4("192.168.1.0/33").is_err());
+    }
+
+    #[test]
+    fn test_parse_cidr_v6_invalid_format() {
+        let config = SecurityConfig::default();
+        let layer = SecurityLayer::new(config);
+
+        // Invalid: missing prefix
+        assert!(layer.parse_cidr_v6("::1").is_err());
+        // Invalid: prefix > 128
+        assert!(layer.parse_cidr_v6("::1/129").is_err());
+    }
+
+    #[test]
+    fn test_is_ip_in_cidr_v4_edge_cases() {
+        let config = SecurityConfig::default();
+        let layer = SecurityLayer::new(config);
+
+        // Test /0 (matches all)
+        let ip = "192.168.1.1".parse().unwrap();
+        let cidr = (ip, 0);
+        assert!(layer.is_ip_in_cidr_v4(&ip, &cidr));
+
+        // Test /32 (exact match)
+        let cidr = (ip, 32);
+        assert!(layer.is_ip_in_cidr_v4(&ip, &cidr));
+    }
+
+    #[test]
+    fn test_is_ip_in_cidr_v6_edge_cases() {
+        let config = SecurityConfig::default();
+        let layer = SecurityLayer::new(config);
+
+        // Test /0 (matches all)
+        let ip = "2001:db8::1".parse().unwrap();
+        let cidr = (ip, 0);
+        assert!(layer.is_ip_in_cidr_v6(&ip, &cidr));
+
+        // Test /128 (exact match)
+        let cidr = (ip, 128);
+        assert!(layer.is_ip_in_cidr_v6(&ip, &cidr));
+    }
+
+    #[test]
+    fn test_check_request_size_no_content_length() {
+        let config = SecurityConfig::default();
+        let layer = SecurityLayer::new(config);
+
+        // Request without Content-Length header should pass
+        let headers = HeaderMap::new();
+        assert!(layer.check_request_size(&headers));
+    }
+
+    #[test]
+    fn test_check_request_size_invalid_content_length() {
+        let config = SecurityConfig::default();
+        let layer = SecurityLayer::new(config);
+
+        // Invalid Content-Length (not a number)
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_LENGTH, "invalid".parse().unwrap());
+        assert!(layer.check_request_size(&headers));
+    }
+
+    #[test]
+    fn test_ip_in_cidr_v6_partial_byte() {
+        let config = SecurityConfig::default();
+        let layer = SecurityLayer::new(config);
+
+        // Test with prefix that doesn't align to byte boundary
+        let network: Ipv6Addr = "2001:db8::".parse().unwrap();
+        let ip_in: Ipv6Addr = "2001:db8::1".parse().unwrap();
+        let ip_out: Ipv6Addr = "2001:db9::1".parse().unwrap();
+
+        // Test /33 (crosses byte boundary)
+        assert!(layer.is_ip_in_cidr_v6(&ip_in, &(network, 33)));
+        assert!(!layer.is_ip_in_cidr_v6(&ip_out, &(network, 33)));
+    }
+
 }

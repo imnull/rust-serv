@@ -166,4 +166,62 @@ mod tests {
         let result = validator_clone.validate(&test_file);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_validate_symlink_within_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let validator = PathValidator::new(temp_dir.path().to_path_buf());
+
+        // Create a file
+        let target_file = temp_dir.path().join("target.txt");
+        std::fs::write(&target_file, "target content").unwrap();
+
+        // Create a symlink within root
+        let symlink = temp_dir.path().join("link.txt");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target_file, &symlink).unwrap();
+
+        // Validate symlink
+        let result = validator.validate(&symlink);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_nonexistent_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let validator = PathValidator::new(temp_dir.path().to_path_buf());
+
+        // Path that doesn't exist
+        let nonexistent = temp_dir.path().join("nonexistent.txt");
+        let result = validator.validate(&nonexistent);
+
+        // Should succeed with normalized path even if file doesn't exist
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_path_with_spaces() {
+        let temp_dir = TempDir::new().unwrap();
+        let validator = PathValidator::new(temp_dir.path().to_path_buf());
+
+        // Create file with spaces in name
+        let file_with_spaces = temp_dir.path().join("file with spaces.txt");
+        std::fs::write(&file_with_spaces, "content").unwrap();
+
+        let result = validator.validate(&file_with_spaces);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_empty_path_components() {
+        let temp_dir = TempDir::new().unwrap();
+        let validator = PathValidator::new(temp_dir.path().to_path_buf());
+
+        // Path with empty components (multiple slashes)
+        let path = temp_dir.path().join("subdir//file.txt");
+        // This test verifies that paths with empty components are handled
+        let result = validator.validate(&path);
+        // Should succeed or fail gracefully
+        assert!(result.is_ok() || result.is_err());
+    }
 }

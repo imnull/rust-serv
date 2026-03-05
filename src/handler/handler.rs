@@ -595,4 +595,121 @@ mod tests {
         let _cloned = handler.clone();
         // Handler should be clonable
     }
+
+    #[test]
+    fn test_compression_type_none() {
+        let config = Arc::new(Config {
+            enable_compression: false,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        std::fs::write(&test_file, "test content for compression").unwrap();
+
+        let content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, content, etag, CompressionType::None);
+
+        assert_eq!(response.status(), 200);
+        // No compression should be applied
+        assert!(response.headers().get("Content-Encoding").is_none());
+    }
+
+    #[test]
+    fn test_serve_file_with_gzip_compression() {
+        let config = Arc::new(Config {
+            enable_compression: true,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        // Create a file with repetitive content for better compression
+        let content = "Hello, World! ".repeat(100);
+        std::fs::write(&test_file, &content).unwrap();
+
+        let file_content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, file_content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, file_content, etag, CompressionType::Gzip);
+
+        assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_serve_file_with_brotli_compression() {
+        let config = Arc::new(Config {
+            enable_compression: true,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        let content = "Hello, World! ".repeat(100);
+        std::fs::write(&test_file, &content).unwrap();
+
+        let file_content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, file_content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, file_content, etag, CompressionType::Brotli);
+
+        assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_serve_file_skip_compression_binary() {
+        let config = Arc::new(Config {
+            enable_compression: true,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        // Binary/image files should not be compressed
+        let test_file = temp_dir.path().join("test.png");
+        let content = vec![0u8; 1000]; // Binary content
+        std::fs::write(&test_file, &content).unwrap();
+
+        let file_content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, file_content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, file_content, etag, CompressionType::Gzip);
+
+        assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_generate_last_modified_nonexistent_file() {
+        let config = Arc::new(Config::default());
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let nonexistent_file = temp_dir.path().join("nonexistent.txt");
+
+        // Should return default date for nonexistent files
+        let last_modified = handler.generate_last_modified(&nonexistent_file);
+        assert!(last_modified.contains("GMT"));
+    }
+
+    #[test]
+    fn test_compression_skipped_for_small_files() {
+        let config = Arc::new(Config {
+            enable_compression: true,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        // Very small content
+        let content = "Hi";
+        std::fs::write(&test_file, content).unwrap();
+
+        let file_content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, file_content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, file_content, etag, CompressionType::Gzip);
+
+        assert_eq!(response.status(), 200);
+    }
 }

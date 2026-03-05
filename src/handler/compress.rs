@@ -210,4 +210,14 @@ mod tests {
         // Highly repetitive data compresses very well
         assert!(compressed.len() < data.len() / 10);
     }
+
+    #[test]
+    fn test_compress_with_none_type() {
+        let data = b"Hello, World! This is a test.";
+        let result = compress(data, CompressionType::None);
+        assert!(result.is_ok());
+        // With None type, data should be returned as-is
+        let compressed = result.unwrap();
+        assert_eq!(compressed, data.to_vec());
+    }
 }

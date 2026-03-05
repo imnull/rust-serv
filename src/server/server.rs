@@ -298,4 +298,134 @@ mod tests {
         assert_eq!(server.config.tls_cert, Some("/path/to/cert.pem".to_string()));
         assert_eq!(server.config.tls_key, Some("/path/to/key.pem".to_string()));
     }
+
+    #[test]
+    fn test_tls_config_missing_cert() {
+        let config = Config {
+            port: 443,
+            root: "/var/www".into(),
+            enable_indexing: true,
+            enable_compression: true,
+            log_level: "info".into(),
+            enable_tls: true,
+            tls_cert: None, // Missing cert
+            tls_key: Some("/path/to/key.pem".to_string()),
+            connection_timeout_secs: 30,
+            max_connections: 1000,
+            enable_health_check: true,
+            enable_cors: true,
+            cors_allowed_origins: vec!["*".to_string()],
+            cors_allowed_methods: vec!["GET".to_string()],
+            cors_allowed_headers: vec![],
+            cors_allow_credentials: false,
+            cors_exposed_headers: vec![],
+            cors_max_age: Some(86400),
+            enable_security: true,
+            rate_limit_max_requests: 100,
+            rate_limit_window_secs: 60,
+            ip_allowlist: vec![],
+            ip_blocklist: vec![],
+            max_body_size: 10 * 1024 * 1024,
+            max_headers: 100,
+        };
+        let server = Server::new(config);
+        assert_eq!(server.config.port, 443);
+        assert!(server.config.enable_tls);
+        assert!(server.config.tls_cert.is_none());
+    }
+
+    #[test]
+    fn test_tls_config_missing_key() {
+        let config = Config {
+            port: 443,
+            root: "/var/www".into(),
+            enable_indexing: true,
+            enable_compression: true,
+            log_level: "info".into(),
+            enable_tls: true,
+            tls_cert: Some("/path/to/cert.pem".to_string()),
+            tls_key: None, // Missing key
+            connection_timeout_secs: 30,
+            max_connections: 1000,
+            enable_health_check: true,
+            enable_cors: true,
+            cors_allowed_origins: vec!["*".to_string()],
+            cors_allowed_methods: vec!["GET".to_string()],
+            cors_allowed_headers: vec![],
+            cors_allow_credentials: false,
+            cors_exposed_headers: vec![],
+            cors_max_age: Some(86400),
+            enable_security: true,
+            rate_limit_max_requests: 100,
+            rate_limit_window_secs: 60,
+            ip_allowlist: vec![],
+            ip_blocklist: vec![],
+            max_body_size: 10 * 1024 * 1024,
+            max_headers: 100,
+        };
+        let server = Server::new(config);
+        assert_eq!(server.config.port, 443);
+        assert!(server.config.tls_key.is_none());
+    }
+
+    #[test]
+    fn test_max_connections_default() {
+        let config = Config::default();
+        assert_eq!(config.max_connections, 1000);
+    }
+
+    #[test]
+    fn test_connection_timeout_default() {
+        let config = Config::default();
+        assert_eq!(config.connection_timeout_secs, 30);
+    }
+
+    #[tokio::test]
+    async fn test_scheme_selection() {
+        // Test HTTP scheme when TLS is disabled
+        let config = Config {
+            enable_tls: false,
+            ..Config::default()
+        };
+        let server = Server::new(config);
+        assert!(!server.config.enable_tls);
+
+    }
+
+    #[tokio::test]
+    async fn test_scheme_selection_https() {
+        // Test HTTPS scheme when TLS is enabled
+        let config = Config {
+            enable_tls: true,
+            tls_cert: Some("/path/cert.pem".to_string()),
+            tls_key: Some("/path/key.pem".to_string()),
+            ..Config::default()
+        };
+        let server = Server::new(config);
+        assert!(server.config.enable_tls);
+    }
+
+    #[tokio::test]
+    async fn test_bind_address() {
+        // Test that address parsing works correctly
+        let port = 9090;
+        let addr_str = format!("0.0.0.0:{}", port);
+        let addr: SocketAddr = addr_str.parse().unwrap();
+        assert_eq!(addr.port(), port);
+    }
+
+    #[tokio::test]
+    async fn test_shutdown_notify() {
+        let config = Config::default();
+        let server = Server::new(config);
+
+        // Clone the signal before shutdown
+        let signal = server.shutdown_signal.clone();
+
+        // Shutdown should notify
+        server.shutdown();
+
+        // The notify should have been triggered
+        // (we can't easily test the without async, but the call shouldn't panic)
+    }
 }

@@ -693,4 +693,172 @@ mod tests {
             assert!(receiver2.recv().await.is_some());
         });
     }
+
+    #[test]
+    fn test_send_to_connection_success() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        futures::executor::block_on(async {
+            let (sender, mut receiver) = mpsc::unbounded_channel();
+            server.add_connection("test_conn".to_string(), sender).await;
+
+            let message = WebSocketMessage::Text("Hello".to_string());
+            let result = server.send_to("test_conn", message).await;
+            assert!(result.is_ok());
+
+            let received = receiver.recv().await;
+            assert!(received.is_some());
+        });
+    }
+
+    #[test]
+    fn test_send_to_connection_not_found() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        futures::executor::block_on(async {
+            let message = WebSocketMessage::Text("Hello".to_string());
+            let result = server.send_to("nonexistent", message).await;
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("not found"));
+        });
+    }
+
+    #[test]
+    fn test_send_to_connection_closed() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        futures::executor::block_on(async {
+            let (sender, receiver) = mpsc::unbounded_channel();
+            drop(receiver); // Close the receiver immediately
+
+            server.add_connection("test_conn".to_string(), sender).await;
+
+            let message = WebSocketMessage::Text("Hello".to_string());
+            let result = server.send_to("test_conn", message).await;
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("closed"));
+        });
+    }
+
+    #[test]
+    fn test_websocket_upgrade_missing_headers() {
+        let req = Request::builder()
+            .method("GET")
+            .uri("/ws")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+
+        // Should return false for non-WebSocket request
+        assert!(!WebSocketServer::is_websocket_upgrade(&req));
+    }
+
+    #[test]
+    fn test_websocket_upgrade_only_upgrade_header() {
+        let req = Request::builder()
+            .method("GET")
+            .uri("/ws")
+            .header("Upgrade", "websocket")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+
+        // Should return false because Connection header is missing
+        assert!(!WebSocketServer::is_websocket_upgrade(&req));
+    }
+
+    #[test]
+    fn test_websocket_upgrade_wrong_method() {
+        let req = Request::builder()
+            .method("POST")
+            .uri("/ws")
+            .header("Upgrade", "websocket")
+            .header("Connection", "Upgrade")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+
+        // Should return false because method is not GET
+        assert!(!WebSocketServer::is_websocket_upgrade(&req));
+    }
+
+    #[test]
+    fn test_handshake_missing_key() {
+        let req = Request::builder()
+            .method("GET")
+            .uri("/ws")
+            .header("Upgrade", "websocket")
+            .header("Connection", "Upgrade")
+            .header("Sec-WebSocket-Version", "13")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+
+        let result = WebSocketServer::handshake(&req);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handshake_missing_version() {
+        let req = Request::builder()
+            .method("GET")
+            .uri("/ws")
+            .header("Upgrade", "websocket")
+            .header("Connection", "Upgrade")
+            .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+
+        let result = WebSocketServer::handshake(&req);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handshake_wrong_version() {
+        let req = Request::builder()
+            .method("GET")
+            .uri("/ws")
+            .header("Upgrade", "websocket")
+            .header("Connection", "Upgrade")
+            .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+            .header("Sec-WebSocket-Version", "12")
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+
+        let result = WebSocketServer::handshake(&req);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_add_and_remove_connection() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let (sender1, _) = mpsc::unbounded_channel();
+        let (sender2, _) = mpsc::unbounded_channel();
+
+        server.add_connection("conn1".to_string(), sender1).await;
+        server.add_connection("conn2".to_string(), sender2).await;
+
+        let count = server.connection_count().await;
+        assert_eq!(count, 2);
+
+        server.remove_connection("conn1").await;
+        let count = server.connection_count().await;
+        assert_eq!(count, 1);
+
+        server.remove_connection("conn2").await;
+        let count = server.connection_count().await;
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_broadcast_empty_connections() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        // Broadcast to empty connections should not fail
+        let message = WebSocketMessage::Text("Hello".to_string());
+        server.broadcast(message).await;
+        // No assertion needed, just ensure no panic
+    }
 }
