@@ -563,4 +563,36 @@ mod tests {
         assert!(response.headers().get("ETag").is_some());
         assert!(response.headers().get("Accept-Ranges").is_some());
     }
+
+    #[test]
+    fn test_serve_file_compression_disabled() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let config = Arc::new(Config {
+            root: temp_dir.path().to_path_buf(),
+            enable_compression: false,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        // Create a large text file
+        let content = "Hello, World! ".repeat(100);
+        let test_file = temp_dir.path().join("test.txt");
+        std::fs::write(&test_file, &content).unwrap();
+
+        let file_content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, file_content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, file_content, etag, CompressionType::None);
+
+        assert_eq!(response.status(), 200);
+        // Content-Encoding header should not be present
+        assert!(response.headers().get("Content-Encoding").is_none());
+    }
+
+    #[test]
+    fn test_handler_clone() {
+        let config = Arc::new(Config::default());
+        let handler = Handler::new(config);
+        let _cloned = handler.clone();
+        // Handler should be clonable
+    }
 }

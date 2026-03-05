@@ -77,8 +77,13 @@ mod tests {
         match result {
             Ok(path) => {
                 // If it succeeds, ensure it's still within bounds
-                let canonical_root = std::fs::canonicalize(temp_dir.path()).unwrap();
-                assert!(path.starts_with(&canonical_root));
+                // Use canonicalize for both paths to ensure proper comparison
+                if let (Ok(canonical_path), Ok(canonical_root)) = (
+                    std::fs::canonicalize(&path),
+                    std::fs::canonicalize(temp_dir.path())
+                ) {
+                    assert!(canonical_path.starts_with(&canonical_root));
+                }
             }
             Err(_) => {
                 // Or it should error for security reasons

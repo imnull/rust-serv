@@ -23,7 +23,7 @@ use tokio_tungstenite::WebSocketStream;
 use futures::{StreamExt, SinkExt};
 
 /// WebSocket message types
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum WebSocketMessage {
     /// Text message
     Text(String),
@@ -440,6 +440,257 @@ mod tests {
             assert_eq!(connections.len(), 2);
             assert!(connections.contains(&"conn1".to_string()));
             assert!(connections.contains(&"conn2".to_string()));
+        });
+    }
+
+    #[test]
+    fn test_send_to_connection() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        futures::executor::block_on(async {
+            // Create a connection with a receiver
+            let (sender, mut receiver) = mpsc::unbounded_channel();
+            server.add_connection("test_conn".to_string(), sender).await;
+
+            // Send a message to the connection
+            let message = WebSocketMessage::Text("Hello".to_string());
+            let result = server.send_to("test_conn", message.clone()).await;
+            assert!(result.is_ok());
+
+            // Verify the message was received
+            let received = receiver.recv().await;
+            assert!(received.is_some());
+            assert_eq!(received.unwrap(), WebSocketMessage::Text("Hello".to_string()));
+
+            // Try to send to non-existent connection
+            let result = server.send_to("nonexistent", message).await;
+            assert!(result.is_err());
+        });
+    }
+
+    #[test]
+    fn test_broadcast_message() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        futures::executor::block_on(async {
+            // Create multiple connections
+            let (sender1, mut receiver1) = mpsc::unbounded_channel();
+            let (sender2, mut receiver2) = mpsc::unbounded_channel();
+            let (sender3, mut receiver3) = mpsc::unbounded_channel();
+
+            server.add_connection("conn1".to_string(), sender1).await;
+            server.add_connection("conn2".to_string(), sender2).await;
+            server.add_connection("conn3".to_string(), sender3).await;
+
+            // Broadcast a message
+            let message = WebSocketMessage::Text("Broadcast message".to_string());
+            server.broadcast(message).await;
+
+            // Verify all connections received the message
+            assert_eq!(
+                receiver1.recv().await.unwrap(),
+                WebSocketMessage::Text("Broadcast message".to_string())
+            );
+            assert_eq!(
+                receiver2.recv().await.unwrap(),
+                WebSocketMessage::Text("Broadcast message".to_string())
+            );
+            assert_eq!(
+                receiver3.recv().await.unwrap(),
+                WebSocketMessage::Text("Broadcast message".to_string())
+            );
+        });
+    }
+
+    #[test]
+    fn test_handle_text_message() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = Message::Text("Hello".into());
+        let result = server.handle_message(message).unwrap();
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), WebSocketMessage::Text("Hello".to_string()));
+    }
+
+    #[test]
+    fn test_handle_binary_message() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = Message::Binary(tungstenite::Bytes::from(vec![1, 2, 3]));
+        let result = server.handle_message(message).unwrap();
+
+        assert!(result.is_some());
+        let ws_message = result.unwrap();
+        assert!(matches!(ws_message, WebSocketMessage::Binary(_)));
+    }
+
+    #[test]
+    fn test_handle_ping_message() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = Message::Ping(tungstenite::Bytes::from(vec![1, 2, 3]));
+        let result = server.handle_message(message).unwrap();
+
+        assert!(result.is_some());
+        let ws_message = result.unwrap();
+        assert!(matches!(ws_message, WebSocketMessage::Pong(_)));
+    }
+
+    #[test]
+    fn test_handle_pong_message() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = Message::Pong(tungstenite::Bytes::from(vec![1, 2, 3]));
+        let result = server.handle_message(message).unwrap();
+
+        assert!(result.is_some());
+        let ws_message = result.unwrap();
+        assert!(matches!(ws_message, WebSocketMessage::Pong(_)));
+    }
+
+    #[test]
+    fn test_handle_close_message_with_frame() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        // Create a close message with a frame using Message::Close
+        let message = Message::Close(Some(tungstenite::protocol::frame::CloseFrame {
+            code: tungstenite::protocol::frame::coding::CloseCode::Normal,
+            reason: "Normal closure".into(),
+        }));
+        let result = server.handle_message(message).unwrap();
+
+        assert!(result.is_some());
+        let ws_message = result.unwrap();
+        match ws_message {
+            WebSocketMessage::Close { code, reason } => {
+                assert_eq!(code, 1000);
+                assert_eq!(reason, "Normal closure");
+            }
+            _ => panic!("Expected Close message"),
+        }
+    }
+
+    #[test]
+    fn test_handle_close_message_without_frame() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = Message::Close(None);
+        let result = server.handle_message(message).unwrap();
+
+        assert!(result.is_some());
+        let ws_message = result.unwrap();
+        match ws_message {
+            WebSocketMessage::Close { code, reason } => {
+                assert_eq!(code, 1000);
+                assert_eq!(reason, "");
+            }
+            _ => panic!("Expected Close message"),
+        }
+    }
+
+    #[test]
+    fn test_to_tungstenite_text() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = WebSocketMessage::Text("Hello".to_string());
+        let converted = server.to_tungstenite_message(&message);
+
+        assert!(matches!(converted, Message::Text(_)));
+        if let Message::Text(text) = converted {
+            assert_eq!(text, "Hello");
+        }
+    }
+
+    #[test]
+    fn test_to_tungstenite_binary() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = WebSocketMessage::Binary(tungstenite::Bytes::from(vec![1, 2, 3]));
+        let converted = server.to_tungstenite_message(&message);
+
+        assert!(matches!(converted, Message::Binary(_)));
+    }
+
+    #[test]
+    fn test_to_tungstenite_ping() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = WebSocketMessage::Ping(tungstenite::Bytes::from(vec![1, 2, 3]));
+        let converted = server.to_tungstenite_message(&message);
+
+        assert!(matches!(converted, Message::Ping(_)));
+    }
+
+    #[test]
+    fn test_to_tungstenite_pong() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = WebSocketMessage::Pong(tungstenite::Bytes::from(vec![1, 2, 3]));
+        let converted = server.to_tungstenite_message(&message);
+
+        assert!(matches!(converted, Message::Pong(_)));
+    }
+
+    #[test]
+    fn test_to_tungstenite_close() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        let message = WebSocketMessage::Close {
+            code: 1000,
+            reason: "Normal closure".to_string(),
+        };
+        let converted = server.to_tungstenite_message(&message);
+
+        assert!(matches!(converted, Message::Close(_)));
+        if let Message::Close(Some(frame)) = converted {
+            assert_eq!(frame.code, tungstenite::protocol::frame::coding::CloseCode::Normal);
+            assert_eq!(frame.reason, std::borrow::Cow::from("Normal closure"));
+        } else {
+            panic!("Expected Close message with frame");
+        }
+    }
+
+    #[test]
+    fn test_broadcast_with_closed_connection() {
+        let config = Config::default();
+        let server = WebSocketServer::new(config);
+
+        futures::executor::block_on(async {
+            // Create a connection with a closed sender
+            let (sender, receiver) = mpsc::unbounded_channel();
+            drop(receiver); // Close the receiver
+
+            server.add_connection("closed_conn".to_string(), sender).await;
+
+            // Create a normal connection
+            let (sender2, mut receiver2) = mpsc::unbounded_channel();
+            server.add_connection("normal_conn".to_string(), sender2).await;
+
+            // Broadcast a message
+            let message = WebSocketMessage::Text("Test".to_string());
+            server.broadcast(message).await;
+
+            // The closed connection should be removed
+            let connections = server.list_connections().await;
+            assert!(!connections.contains(&"closed_conn".to_string()));
+            assert!(connections.contains(&"normal_conn".to_string()));
+
+            // The normal connection should still receive the message
+            assert!(receiver2.recv().await.is_some());
         });
     }
 }

@@ -157,6 +157,7 @@ async fn test_config_options() {
         connection_timeout_secs: 30,
         max_connections: 1000,
         enable_health_check: true,
+        ..Default::default()
     };
 
     assert_eq!(custom_config.port, 3000);
