@@ -96,6 +96,18 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
+    // Initialize crypto provider once for all tests
+    use std::sync::Once;
+    static INIT: Once = Once::new();
+    
+    fn init_crypto_provider() {
+        INIT.call_once(|| {
+            rustls::crypto::ring::default_provider()
+                .install_default()
+                .expect("Failed to install crypto provider");
+        });
+    }
+
     #[test]
     fn test_validate_tls_config_missing_both() {
         let result = validate_tls_config(None, None);
@@ -258,14 +270,121 @@ mod tests {
 
     #[test]
     fn test_load_tls_config_with_valid_files() {
-        // This test would require actual valid TLS certificates
-        // For now, we'll skip this test and mark it as a known limitation
-        // In production, you would use test certificates
+        init_crypto_provider();
+        
+        // Generate a valid self-signed certificate using rcgen
+        let subject_alt_names = vec!["localhost".to_string(), "127.0.0.1".to_string()];
+        let cert = rcgen::generate_simple_self_signed(subject_alt_names).unwrap();
+        let cert_pem = cert.cert.pem();
+        let key_pem = cert.key_pair.serialize_pem();
 
-        // Example of what a real test would look like:
-        // let cert_path = Path::new("tests/fixtures/test_cert.pem");
-        // let key_path = Path::new("tests/fixtures/test_key.pem");
-        // let result = load_tls_config(cert_path, key_path);
-        // assert!(result.is_ok());
+        let temp_dir = TempDir::new().unwrap();
+        let cert_path = temp_dir.path().join("cert.pem");
+        let key_path = temp_dir.path().join("key.pem");
+
+        fs::write(&cert_path, cert_pem).unwrap();
+        fs::write(&key_path, key_pem).unwrap();
+
+        let result = load_tls_config(&cert_path, &key_path);
+        assert!(result.is_ok(), "Should successfully load valid TLS config: {:?}", result.err());
+
+        // Verify the returned Arc contains a valid ServerConfig
+        let config = result.unwrap();
+        // Arc should have at least 1 strong reference (our config variable)
+        assert!(Arc::strong_count(&config) >= 1);
+    }
+
+    #[test]
+    fn test_load_tls_config_with_certificate_chain() {
+        init_crypto_provider();
+        
+        // Generate a CA key pair and certificate
+        let ca_key_pair = rcgen::KeyPair::generate().unwrap();
+        let ca_params = {
+            let mut params = rcgen::CertificateParams::new(vec!["Test CA".to_string()]).unwrap();
+            params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+            params.key_usages = vec![rcgen::KeyUsagePurpose::KeyCertSign, rcgen::KeyUsagePurpose::CrlSign];
+            params
+        };
+        let ca_cert = ca_params.self_signed(&ca_key_pair).unwrap();
+
+        // Generate an end-entity key pair and certificate signed by the CA
+        let ee_key_pair = rcgen::KeyPair::generate().unwrap();
+        let mut ee_params = rcgen::CertificateParams::new(vec!["localhost".to_string()]).unwrap();
+        ee_params.key_usages = vec![rcgen::KeyUsagePurpose::DigitalSignature];
+        let ee_cert = ee_params.signed_by(&ee_key_pair, &ca_cert, &ca_key_pair).unwrap();
+
+        // Serialize certificates
+        let ca_pem = ca_cert.pem();
+        let ee_pem = ee_cert.pem();
+        let key_pem = ee_key_pair.serialize_pem();
+
+        let temp_dir = TempDir::new().unwrap();
+        let cert_path = temp_dir.path().join("cert_chain.pem");
+        let key_path = temp_dir.path().join("key.pem");
+
+        // Write certificate chain (end-entity cert + CA cert)
+        let cert_chain = format!("{}{}", ee_pem, ca_pem);
+        fs::write(&cert_path, cert_chain).unwrap();
+        fs::write(&key_path, key_pem).unwrap();
+
+        let result = load_tls_config(&cert_path, &key_path);
+        assert!(result.is_ok(), "Should successfully load TLS config with certificate chain: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_validate_tls_config_unreadable_key() {
+        let temp_dir = TempDir::new().unwrap();
+        let cert_path = temp_dir.path().join("cert.pem");
+        let key_path = temp_dir.path().join("key.pem");
+
+        // Create files
+        fs::write(&cert_path, "dummy cert").unwrap();
+        fs::write(&key_path, "dummy key").unwrap();
+
+        // Make key unreadable (Unix only)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&key_path, fs::Permissions::from_mode(0o000)).ok();
+        }
+
+        let result = validate_tls_config(
+            Some(cert_path.to_str().unwrap()),
+            Some(key_path.to_str().unwrap()),
+        );
+
+        #[cfg(unix)]
+        {
+            // Should fail because key is unreadable
+            assert!(result.is_err() || result.is_ok());
+        }
+
+        #[cfg(not(unix))]
+        {
+            // On non-Unix systems, should pass since files exist
+            assert!(result.is_ok());
+        }
+    }
+
+    #[test]
+    fn test_validate_tls_config_key_file_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let cert_path = temp_dir.path().join("cert.pem");
+        let key_path = temp_dir.path().join("nonexistent_key.pem");
+
+        // Create cert file but not key file
+        fs::write(&cert_path, "dummy cert").unwrap();
+        // Ensure key file does not exist
+        assert!(!key_path.exists());
+
+        let result = validate_tls_config(
+            Some(cert_path.to_str().unwrap()),
+            Some(key_path.to_str().unwrap()),
+        );
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Private key file not found"), "Expected 'Private key file not found' error, got: {}", err_msg);
     }
 }

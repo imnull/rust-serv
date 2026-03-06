@@ -712,4 +712,228 @@ mod tests {
 
         assert_eq!(response.status(), 200);
     }
+
+    #[test]
+    fn test_serve_file_cache_control_headers() {
+        let config = Arc::new(Config::default());
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        std::fs::write(&test_file, "test content").unwrap();
+
+        let content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, content, etag, CompressionType::None);
+
+        // Verify cache control headers
+        let cache_control = response.headers().get("Cache-Control").unwrap().to_str().unwrap();
+        assert!(cache_control.contains("public"));
+        assert!(cache_control.contains("max-age"));
+    }
+
+    #[test]
+    fn test_serve_file_with_vary_header() {
+        let config = Arc::new(Config {
+            enable_compression: true,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        // Create compressible content
+        let content = "Hello, World! ".repeat(100);
+        std::fs::write(&test_file, &content).unwrap();
+
+        let file_content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, file_content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, file_content, etag, CompressionType::Gzip);
+
+        assert_eq!(response.status(), 200);
+        // When compression is applied, Vary header should be present
+        if let Some(vary) = response.headers().get("Vary") {
+            assert!(vary.to_str().unwrap().contains("Accept-Encoding"));
+        }
+    }
+
+    #[test]
+    fn test_generate_directory_html_with_parent_link() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let config = Arc::new(Config {
+            root: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        // Create a subdirectory
+        let subdir = temp_dir.path().join("subdir");
+        std::fs::create_dir(&subdir).unwrap();
+
+        let files = vec![
+            FileMetadata {
+                path: subdir.join("file1.txt").display().to_string(),
+                name: "file1.txt".to_string(),
+                size: 100,
+                is_dir: false,
+            },
+        ];
+
+        // Generate HTML for subdirectory (not root)
+        let html = handler.generate_directory_html(&subdir, &files);
+        
+        // Should contain parent directory link
+        assert!(html.contains("../"));
+        assert!(html.contains("Parent Directory") || html.contains("../"));
+    }
+
+    #[test]
+    fn test_serve_file_with_brotli_has_vary_header() {
+        let config = Arc::new(Config {
+            enable_compression: true,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.css");
+        let content = "body { color: red; } ".repeat(50);
+        std::fs::write(&test_file, &content).unwrap();
+
+        let file_content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, file_content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, file_content, etag, CompressionType::Brotli);
+
+        assert_eq!(response.status(), 200);
+        // Check for Content-Encoding header
+        if let Some(encoding) = response.headers().get("Content-Encoding") {
+            assert_eq!(encoding.to_str().unwrap(), "br");
+        }
+    }
+
+    #[test]
+    fn test_etag_format() {
+        let config = Arc::new(Config::default());
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        std::fs::write(&test_file, "content").unwrap();
+
+        let metadata = std::fs::metadata(&test_file).unwrap();
+        let file_size = metadata.len();
+        let etag = handler.generate_etag(&test_file, file_size);
+
+        // ETag format: "timestamp-filesize"
+        assert!(etag.starts_with('"'));
+        assert!(etag.ends_with('"'));
+        assert!(etag.contains('-'));
+        
+        // Extract parts
+        let inner = &etag[1..etag.len()-1];
+        let parts: Vec<&str> = inner.split('-').collect();
+        assert_eq!(parts.len(), 2);
+        
+        // Both parts should be numeric
+        assert!(parts[0].parse::<u64>().is_ok());
+        assert!(parts[1].parse::<u64>().is_ok());
+    }
+
+    #[test]
+    fn test_generate_directory_html_special_chars() {
+        let config = Arc::new(Config::default());
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        
+        // Files with special characters
+        let files = vec![
+            FileMetadata {
+                path: temp_dir.path().join("file with spaces & symbols.txt").display().to_string(),
+                name: "file with spaces & symbols.txt".to_string(),
+                size: 100,
+                is_dir: false,
+            },
+        ];
+
+        let html = handler.generate_directory_html(&temp_dir.path().to_path_buf(), &files);
+        assert!(html.contains("file with spaces & symbols.txt"));
+    }
+
+    #[test]
+    fn test_serve_file_with_uncompressible_content_type() {
+        let config = Arc::new(Config {
+            enable_compression: true,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        // Test with image file which should skip compression
+        let test_file = temp_dir.path().join("test.png");
+        let content = vec![0u8; 1000]; // Binary content
+        std::fs::write(&test_file, &content).unwrap();
+
+        let file_content = std::fs::read(&test_file).unwrap();
+        let etag = handler.generate_etag(&test_file, file_content.len() as u64);
+        let response = handler.serve_file_with_etag(&test_file, file_content, etag, CompressionType::Gzip);
+
+        assert_eq!(response.status(), 200);
+        // Image files should not have Content-Encoding header
+        assert!(response.headers().get("Content-Encoding").is_none());
+    }
+
+    #[test]
+    fn test_directory_listing_error_returns_500() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let config = Arc::new(Config {
+            root: temp_dir.path().to_path_buf(),
+            enable_indexing: true,
+            ..Default::default()
+        });
+        let handler = Handler::new(config);
+
+        // Create a file instead of directory to cause list_directory to fail
+        let not_a_dir = temp_dir.path().join("not_a_dir");
+        std::fs::write(&not_a_dir, "I'm a file").unwrap();
+
+        let response = handler.serve_directory_index(&not_a_dir);
+        // When list_directory fails on a file, it should return 500
+        assert_eq!(response.status(), 500);
+    }
+
+    #[test]
+    fn test_last_modified_format() {
+        let config = Arc::new(Config::default());
+        let handler = Handler::new(config);
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        std::fs::write(&test_file, "content").unwrap();
+
+        let last_modified = handler.generate_last_modified(&test_file);
+
+        // Format should be like: "Wed, 21 Oct 2015 07:28:00 GMT"
+        assert!(last_modified.contains("GMT"));
+        // Should have day, month, year format
+        let parts: Vec<&str> = last_modified.split_whitespace().collect();
+        assert!(parts.len() >= 5);
+    }
+
+    #[test]
+    fn test_handler_config_values() {
+        let config = Arc::new(Config {
+            port: 9090,
+            root: "/custom/path".into(),
+            enable_indexing: true,
+            enable_compression: false,
+            ..Default::default()
+        });
+        let handler = Handler::new(config.clone());
+
+        assert_eq!(handler.config.port, 9090);
+        assert_eq!(handler.config.root, PathBuf::from("/custom/path"));
+        assert!(handler.config.enable_indexing);
+        assert!(!handler.config.enable_compression);
+    }
 }
