@@ -140,7 +140,7 @@ impl ThrottleLimiter {
         }
         
         if self.config.has_per_ip_limit() {
-            let mut buckets = self.ip_buckets.write().await;
+            let buckets = self.ip_buckets.write().await;
             if let Some(bucket) = buckets.get(ip) {
                 let mut bucket = bucket.clone();
                 max_wait = max_wait.max(bucket.wait_time(bytes));

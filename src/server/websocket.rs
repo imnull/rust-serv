@@ -50,15 +50,13 @@ pub struct WebSocketConnection {
 
 /// WebSocket server with connection management
 pub struct WebSocketServer {
-    config: Arc<Config>,
     connections: Arc<RwLock<HashMap<String, mpsc::UnboundedSender<WebSocketMessage>>>>,
 }
 
 impl WebSocketServer {
     /// Create a new WebSocket server
-    pub fn new(config: Config) -> Self {
+    pub fn new(_config: Config) -> Self {
         Self {
-            config: Arc::new(config),
             connections: Arc::new(RwLock::new(HashMap::new())),
         }
     }

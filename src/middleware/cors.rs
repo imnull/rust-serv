@@ -8,7 +8,7 @@
 //! - Request method validation
 
 use hyper::{HeaderMap, Method};
-use hyper::header::{HeaderValue, ORIGIN, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_EXPOSE_HEADERS, ACCESS_CONTROL_MAX_AGE, ACCESS_CONTROL_REQUEST_METHOD, ACCESS_CONTROL_REQUEST_HEADERS};
+use hyper::header::{HeaderValue, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_EXPOSE_HEADERS, ACCESS_CONTROL_MAX_AGE};
 use std::sync::Arc;
 
 /// CORS configuration options
@@ -67,22 +67,6 @@ impl CorsLayer {
 
         self.config.allowed_origins.iter().any(|allowed| {
             allowed == "*" || origin == allowed
-        })
-    }
-
-    /// Check if method is allowed
-    fn is_method_allowed(&self, method: &Method) -> bool {
-        self.config.allowed_methods.contains(method)
-    }
-
-    /// Check if header is allowed
-    fn is_header_allowed(&self, header_name: &str) -> bool {
-        if self.config.allowed_headers.is_empty() {
-            return true;
-        }
-
-        self.config.allowed_headers.iter().any(|allowed| {
-            header_name == allowed
         })
     }
 
@@ -182,33 +166,6 @@ mod tests {
     }
 
     #[test]
-    fn test_method_validation() {
-        let config = CorsConfig {
-            allowed_methods: vec![Method::GET, Method::POST],
-            ..Default::default()
-        };
-        let cors = CorsLayer::new(config);
-
-        assert!(cors.is_method_allowed(&Method::GET));
-        assert!(cors.is_method_allowed(&Method::POST));
-        assert!(!cors.is_method_allowed(&Method::DELETE));
-        assert!(!cors.is_method_allowed(&Method::PUT));
-    }
-
-    #[test]
-    fn test_header_validation() {
-        let config = CorsConfig {
-            allowed_headers: vec!["Content-Type".to_string(), "Authorization".to_string()],
-            ..Default::default()
-        };
-        let cors = CorsLayer::new(config);
-
-        assert!(cors.is_header_allowed("Content-Type"));
-        assert!(cors.is_header_allowed("Authorization"));
-        assert!(!cors.is_header_allowed("X-Custom-Header"));
-    }
-
-    #[test]
     fn test_credentials_config() {
         let config_with_creds = CorsConfig {
             allow_credentials: true,
@@ -274,28 +231,6 @@ mod tests {
             response_headers.get(ACCESS_CONTROL_EXPOSE_HEADERS).unwrap(),
             HeaderValue::from_bytes("X-Custom-Header, X-Another-Header".as_bytes()).unwrap()
         );
-    }
-
-    #[test]
-    fn test_preflight_invalid_method() {
-        let config = CorsConfig {
-            allowed_methods: vec![Method::GET],
-            ..Default::default()
-        };
-        let cors = CorsLayer::new(config);
-
-        assert!(!cors.is_method_allowed(&Method::DELETE));
-    }
-
-    #[test]
-    fn test_preflight_invalid_header() {
-        let config = CorsConfig {
-            allowed_headers: vec!["Content-Type".to_string()],
-            ..Default::default()
-        };
-        let cors = CorsLayer::new(config);
-
-        assert!(!cors.is_header_allowed("X-Forbidden-Header"));
     }
 
     #[test]

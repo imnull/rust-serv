@@ -16,18 +16,12 @@ use std::sync::Arc;
 use std::io::Write;
 
 /// HTTP/2 server with push support
-pub struct Http2Server {
-    config: Arc<Config>,
-    handler: Arc<Handler>,
-}
+pub struct Http2Server;
 
 impl Http2Server {
     /// Create a new HTTP/2 server
-    pub fn new(config: Config, handler: Arc<Handler>) -> Self {
-        Self {
-            config: Arc::new(config),
-            handler,
-        }
+    pub fn new(_config: Config, _handler: Arc<Handler>) -> Self {
+        Self
     }
 
     /// Handle HTTP/2 push request
@@ -428,15 +422,6 @@ mod tests {
         headers.insert("content-type", "application/http2+push".parse().unwrap());
 
         assert!(!Http2Server::is_http2_push(&Method::PUT, &headers));
-    }
-
-    #[tokio::test]
-    async fn test_http2_server_new() {
-        let config = Config::default();
-        let handler = Arc::new(Handler::new(Arc::new(config.clone())));
-        let server = Http2Server::new(config, handler);
-        // Server created successfully
-        assert!(Arc::strong_count(&server.config) >= 1);
     }
 
     #[tokio::test]

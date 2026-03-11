@@ -35,12 +35,8 @@ impl Default for CacheConfig {
 /// LRU cache entry metadata
 #[derive(Debug, Clone)]
 struct LruEntry {
-    /// Key (path) for the entry
-    key: PathBuf,
     /// Cached file data
     file: CachedFile,
-    /// Access count
-    access_count: u64,
 }
 
 /// Thread-safe memory cache with LRU eviction
@@ -119,11 +115,7 @@ impl MemoryCache {
         self.evict_if_needed(size);
         
         let file = CachedFile::new(content, mime_type, etag, last_modified, ttl);
-        let entry = LruEntry {
-            key: path.clone(),
-            file,
-            access_count: 0,
-        };
+        let entry = LruEntry { file };
         
         {
             let mut cache = self.cache.write().unwrap();

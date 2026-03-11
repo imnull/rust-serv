@@ -94,8 +94,6 @@ impl MultipartParser {
     /// Parse multipart data
     pub fn parse(&self, data: &[u8]) -> Result<Vec<MultipartPart>, String> {
         let mut parts = Vec::new();
-        let start_marker = format!("--{}\r\n", self.boundary);
-        let end_marker = format!("\r\n--{}--", self.boundary);
         
         // Find all boundaries
         let boundary_bytes = format!("--{}", self.boundary);

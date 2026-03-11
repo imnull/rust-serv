@@ -1,6 +1,5 @@
 //! Access log entry and formatting
 
-use std::net::SocketAddr;
 use std::time::SystemTime;
 
 /// Access log entry

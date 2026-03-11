@@ -4,25 +4,6 @@ use std::collections::HashMap;
 
 use super::credentials::Credentials;
 
-/// User entry with password hash
-#[derive(Debug, Clone)]
-pub struct UserEntry {
-    /// Username
-    pub username: String,
-    /// Password (plain text for simplicity, can be hashed in production)
-    pub password: String,
-}
-
-impl UserEntry {
-    /// Create a new user entry
-    pub fn new(username: impl Into<String>, password: impl Into<String>) -> Self {
-        Self {
-            username: username.into(),
-            password: password.into(),
-        }
-    }
-}
-
 /// Authentication validator
 #[derive(Debug, Clone)]
 pub struct AuthValidator {
@@ -106,13 +87,6 @@ impl Default for AuthValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_user_entry_creation() {
-        let user = UserEntry::new("admin", "password");
-        assert_eq!(user.username, "admin");
-        assert_eq!(user.password, "password");
-    }
 
     #[test]
     fn test_validator_creation() {

@@ -1,8 +1,8 @@
 //! Configuration file watcher
 
-use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{channel, Receiver};
 
 /// Watches configuration files for changes
 pub struct ConfigWatcher {
@@ -23,10 +23,8 @@ pub enum ConfigEvent {
 
 impl ConfigWatcher {
     /// Create a new config watcher for a file path
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new<P: AsRef<Path>>(_path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let (tx, rx) = channel();
-        
-        let path = path.as_ref().to_path_buf();
         
         let watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
             match res {

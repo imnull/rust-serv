@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use crate::config::Config;
 use crate::config_reloader::diff::ConfigDiff;
-use crate::config_reloader::watcher::{ConfigEvent, ConfigWatcher};
+use crate::config_reloader::watcher::ConfigWatcher;
 
 /// Configuration reload result
 #[derive(Debug, Clone, PartialEq)]
