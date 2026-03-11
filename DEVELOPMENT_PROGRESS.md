@@ -63,6 +63,11 @@ Rust Serv 是一个高性能、安全的 HTTP 静态文件服务器，使用 Rus
 | `memory_cache/cache.rs` | 99.42% | 97.92% | 99.13% | ✅ |
 | `memory_cache/cached_file.rs` | 100.00% | 100.00% | 100.00% | ✅ |
 | `memory_cache/stats.rs` | 100.00% | 100.00% | 100.00% | ✅ |
+| `metrics/collector.rs` | 94.93% | 92.86% | 95.09% | 🟡 |
+| `metrics/counter.rs` | 100.00% | 100.00% | 100.00% | ✅ |
+| `metrics/gauge.rs` | 100.00% | 100.00% | 100.00% | ✅ |
+| `metrics/histogram.rs` | 98.30% | 100.00% | 99.08% | ✅ |
+| `metrics/prometheus.rs` | 100.00% | 100.00% | 100.00% | ✅ |
 | `mime_types/detector.rs` | 100.00% | 100.00% | 97.06% | ✅ |
 | `path_security/validator.rs` | 94.40% | 93.75% | 94.82% | 🟡 |
 | `utils/helpers.rs` | 100.00% | 100.00% | 100.00% | ✅ |
@@ -78,9 +83,9 @@ Rust Serv 是一个高性能、安全的 HTTP 静态文件服务器，使用 Rus
 
 | 类型 | 数量 |
 |------|------|
-| 单元测试 (Unit Tests) | 333 个 |
+| 单元测试 (Unit Tests) | 385+ 个 |
 | 集成测试 (Integration Tests) | 25 个 |
-| **总计** | **358+ 个** |
+| **总计** | **410+ 个** |
 
 ### 测试文件分布
 
@@ -174,6 +179,14 @@ tests/
    - 线程安全并发访问
    - 缓存命中率统计
    - 手动/自动清理过期条目
+
+8. **Prometheus 指标监控** 🆕 (2026-03-11)
+   - Counter 计数器 (请求数、错误数)
+   - Gauge 仪表 (活跃连接数)
+   - Histogram 直方图 (响应时间分布)
+   - Prometheus 文本格式导出
+   - 自定义命名空间支持
+   - 线程安全指标收集
 
 ---
 
