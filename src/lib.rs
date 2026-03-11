@@ -1,10 +1,13 @@
-//! Rust HTTP Static Server
+ //! Rust HTTP Static Server
 //!
 //! A high-performance, secure HTTP static file server built with Rust.
 
+pub mod access_log;
+pub mod basic_auth;
 pub mod config;
 pub mod config_reloader;
 pub mod error;
+pub mod error_pages;
 pub mod file_service;
 pub mod handler;
 pub mod memory_cache;
