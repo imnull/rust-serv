@@ -17,6 +17,7 @@ pub mod mime_types;
 pub mod path_security;
 pub mod server;
 pub mod utils;
+pub mod vhost;
 
 pub use config::Config;
 pub use config_reloader::{ConfigDiff, ConfigReloader, ConfigWatcher};
