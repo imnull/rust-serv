@@ -1570,6 +1570,7 @@ dependencies = [
  "anyhow",
  "base64",
  "brotli 7.0.0",
+ "bytes",
  "criterion",
  "flate2",
  "futures",

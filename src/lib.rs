@@ -6,6 +6,7 @@ pub mod config;
 pub mod error;
 pub mod file_service;
 pub mod handler;
+pub mod memory_cache;
 pub mod middleware;
 pub mod mime_types;
 pub mod path_security;
@@ -14,4 +15,5 @@ pub mod utils;
 
 pub use config::Config;
 pub use error::{Error, Result};
+pub use memory_cache::{CacheConfig, CacheStats, CachedFile, MemoryCache};
 pub use server::Server;
