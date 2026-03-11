@@ -18,6 +18,7 @@ pub mod mime_types;
 pub mod path_security;
 pub mod proxy;
 pub mod server;
+pub mod throttle;
 pub mod utils;
 pub mod vhost;
 
