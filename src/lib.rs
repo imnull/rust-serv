@@ -3,6 +3,7 @@
 //! A high-performance, secure HTTP static file server built with Rust.
 
 pub mod config;
+pub mod config_reloader;
 pub mod error;
 pub mod file_service;
 pub mod handler;
@@ -15,6 +16,7 @@ pub mod server;
 pub mod utils;
 
 pub use config::Config;
+pub use config_reloader::{ConfigDiff, ConfigReloader, ConfigWatcher};
 pub use error::{Error, Result};
 pub use memory_cache::{CacheConfig, CacheStats, CachedFile, MemoryCache};
 pub use metrics::{Counter, Gauge, Histogram, MetricsCollector, PrometheusExporter};
