@@ -1,5 +1,5 @@
 [package]
-name = "rust_serv"
+name = "rust-serv"
 version = "0.1.0"
 edition = "2021"
 authors = ["Marvin <imnull@outlook.com>"]
