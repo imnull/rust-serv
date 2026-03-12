@@ -1,6 +1,6 @@
 [package]
 name = "rust-serv"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Marvin <imnull@outlook.com>"]
 description = "A high-performance, secure, and feature-rich HTTP static file server in Rust"
@@ -48,6 +48,8 @@ brotli = "7.0"
 rustls-pemfile = "2.2"
 tokio-rustls = "0.26"
 rustls = { version = "0.23", features = ["ring", "std"] }
+instant-acme = "0.7"
+x509-parser = "0.16"
 
 # Error handling
 anyhow = "1.0"
