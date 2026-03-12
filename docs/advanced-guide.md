@@ -1,5 +1,9 @@
 # 进阶指南
 
+[English](./en/advanced-guide.md) | **中文**
+
+---
+
 > 掌握 rust-serv 的核心功能，提升你的开发效率
 
 ## 📖 前置知识

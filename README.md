@@ -1,6 +1,15 @@
 # Rust HTTP 静态服务器
 
+[English](./README_EN.md) | **中文**
+
 一个高性能、安全、功能丰富的 Rust HTTP 静态文件服务器，采用测试驱动开发（TDD）范式开发，测试覆盖率 95%+。
+
+## 📚 文档
+
+- **[快速入门](./docs/getting-started.md)** | [English](./docs/en/getting-started.md) - 5分钟上手指南
+- **[进阶指南](./docs/advanced-guide.md)** | [English](./docs/en/advanced-guide.md) - 核心功能详解
+- **[高级指南](./docs/expert-guide.md)** | [English](./docs/en/expert-guide.md) - 生产环境部署
+- **[配置参考](./docs/configuration.md)** | [English](./docs/en/configuration.md) - 完整参数说明
 
 ## 特性
 

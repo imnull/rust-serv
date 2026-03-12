@@ -1,5 +1,9 @@
 # 快速入门指南
 
+[English](./en/getting-started.md) | **中文**
+
+---
+
 > 5分钟上手 rust-serv，从零开始搭建你的第一个 Web 服务
 
 ## 🦀 rust-serv 是什么？

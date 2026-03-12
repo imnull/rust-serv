@@ -1,5 +1,9 @@
 # 配置参数参考
 
+[English](./en/configuration.md) | **中文**
+
+---
+
 > rust-serv 完整配置参数说明
 
 ## 📖 目录
