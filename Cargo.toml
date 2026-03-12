@@ -50,6 +50,8 @@ tokio-rustls = "0.26"
 rustls = { version = "0.23", features = ["ring", "std"] }
 instant-acme = "0.7"
 x509-parser = "0.16"
+rustls-pki-types = "1"
+rcgen = "0.13"
 
 # Error handling
 anyhow = "1.0"
