@@ -1,6 +1,6 @@
 [package]
 name = "rust-serv"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Marvin <imnull@outlook.com>"]
 description = "A high-performance, secure, and feature-rich HTTP static file server in Rust"
