@@ -413,7 +413,12 @@ cargo bench
 - Tower 团队 - 中间件抽象
 - Rust 社区 - 强大生态
 
+## 作者
+
+**Marvin** - [imnull@outlook.com](mailto:imnull@outlook.com)
+
 ## 联系方式
 
-- GitHub: [https://github.com/imnull/rust-serv](https://github.com/imnull/rust-serv)
-- Issues: [GitHub Issues](https://github.com/imnull/rust-serv/issues)
+- **GitHub**: [https://github.com/imnull/rust-serv](https://github.com/imnull/rust-serv)
+- **Issues**: [GitHub Issues](https://github.com/imnull/rust-serv/issues)
+- **Email**: [imnull@outlook.com](mailto:imnull@outlook.com)

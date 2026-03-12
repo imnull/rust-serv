@@ -2,9 +2,14 @@
 name = "rust_serv"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
-description = "A high-performance HTTP static file server in Rust"
+authors = ["Marvin <imnull@outlook.com>"]
+description = "A high-performance, secure, and feature-rich HTTP static file server in Rust"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/imnull/rust-serv"
+homepage = "https://github.com/imnull/rust-serv"
+readme = "README.md"
+keywords = ["http", "server", "static-files", "web-server", "hyper"]
+categories = ["web-programming::http-server", "network-programming"]
 
 [dependencies]
 # Async runtime
