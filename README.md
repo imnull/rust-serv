@@ -26,6 +26,14 @@
 - ✅ **Prometheus 指标** - Counter/Gauge/Histogram，监控 QPS、响应时间、错误率
 - ✅ **访问日志持久化** - Common/Combined/JSON 格式
 - ✅ **结构化日志** - 基于 tracing 的日志系统
+- ✅ **管理 API** - 健康检查、就绪探针、运行时统计（K8s 友好）
+
+### 安全特性
+- ✅ **基础认证 (Basic Auth)** - HTTP Basic Auth，路径保护
+- ✅ **请求频率限制** - 防止 DDoS 攻击
+- ✅ **IP 访问控制** - 白名单/黑名单
+- ✅ **安全头** - XSS、CSRF 防护
+- ✅ **自动 HTTPS 证书** - Let's Encrypt 自动获取和续期
 
 ### 安全特性
 - ✅ **基础认证 (Basic Auth)** - HTTP Basic Auth，路径保护
@@ -94,6 +102,22 @@ ttl_secs = 3600
 enabled = true
 path = "/metrics"
 namespace = "rust_serv"
+
+# 管理端点 (K8s 健康检查)
+[management]
+enabled = true
+health_path = "/health"    # 存活探针
+ready_path = "/ready"      # 就绪探针
+stats_path = "/stats"      # 运行时统计
+
+# 自动 HTTPS 证书 (Let's Encrypt)
+[auto_tls]
+enabled = true
+domains = ["example.com", "www.example.com"]
+email = "admin@example.com"
+challenge_type = "http-01"
+cache_dir = "./certs"
+renew_before_days = 30
 
 # 访问日志
 [access_log]
