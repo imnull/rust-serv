@@ -215,6 +215,8 @@ mod tests {
             ip_blocklist: vec![],
             max_body_size: 10 * 1024 * 1024,
             max_headers: 100,
+            management: None,
+            auto_tls: None,
         };
         let server = Server::new(config);
         assert_eq!(server.config.port, 3000);
@@ -291,6 +293,8 @@ mod tests {
             ip_blocklist: vec![],
             max_body_size: 10 * 1024 * 1024,
             max_headers: 100,
+            management: None,
+            auto_tls: None,
         };
         let server = Server::new(config);
         assert_eq!(server.config.port, 443);
@@ -327,6 +331,8 @@ mod tests {
             ip_blocklist: vec![],
             max_body_size: 10 * 1024 * 1024,
             max_headers: 100,
+            management: None,
+            auto_tls: None,
         };
         let server = Server::new(config);
         assert_eq!(server.config.port, 443);
@@ -362,6 +368,8 @@ mod tests {
             ip_blocklist: vec![],
             max_body_size: 10 * 1024 * 1024,
             max_headers: 100,
+            management: None,
+            auto_tls: None,
         };
         let server = Server::new(config);
         assert_eq!(server.config.port, 443);
@@ -1066,6 +1074,8 @@ mod tests {
             ip_blocklist: vec!["10.0.0.1".into()],
             max_body_size: 50 * 1024 * 1024,
             max_headers: 200,
+            management: None,
+            auto_tls: None,
         };
         
         let server = Server::new(config.clone());

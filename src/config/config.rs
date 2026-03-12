@@ -103,6 +103,62 @@ pub struct Config {
     /// Request size limits: Max headers (default: 100)
     #[serde(default = "default_max_headers")]
     pub max_headers: usize,
+
+    /// Management API configuration
+    #[serde(default)]
+    pub management: Option<ManagementConfig>,
+
+    /// Auto TLS (Let's Encrypt) configuration
+    #[serde(default)]
+    pub auto_tls: Option<AutoTlsConfig>,
+}
+
+/// Management API configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ManagementConfig {
+    /// Enable management API endpoints (default: false)
+    #[serde(default = "default_management_enabled")]
+    pub enabled: bool,
+
+    /// Health check endpoint path (default: "/health")
+    #[serde(default = "default_health_path")]
+    pub health_path: String,
+
+    /// Readiness check endpoint path (default: "/ready")
+    #[serde(default = "default_ready_path")]
+    pub ready_path: String,
+
+    /// Stats endpoint path (default: "/stats")
+    #[serde(default = "default_stats_path")]
+    pub stats_path: String,
+}
+
+/// Auto TLS (Let's Encrypt) configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AutoTlsConfig {
+    /// Enable auto TLS certificate management (default: false)
+    #[serde(default = "default_auto_tls_enabled")]
+    pub enabled: bool,
+
+    /// Domains for certificate
+    #[serde(default)]
+    pub domains: Vec<String>,
+
+    /// Email for Let's Encrypt registration
+    #[serde(default)]
+    pub email: String,
+
+    /// ACME challenge type: "http-01" or "dns-01" (default: "http-01")
+    #[serde(default = "default_challenge_type")]
+    pub challenge_type: String,
+
+    /// Certificate cache directory (default: "./certs")
+    #[serde(default = "default_cache_dir")]
+    pub cache_dir: String,
+
+    /// Days before expiration to renew (default: 30)
+    #[serde(default = "default_renew_before_days")]
+    pub renew_before_days: u32,
 }
 
 impl Default for Config {
@@ -141,6 +197,8 @@ impl Default for Config {
             ip_blocklist: vec![],
             max_body_size: 10 * 1024 * 1024, // 10 MB
             max_headers: 100,
+            management: None,
+            auto_tls: None,
         }
     }
 }
@@ -245,6 +303,40 @@ fn default_max_headers() -> usize {
     100
 }
 
+// Management config defaults
+fn default_management_enabled() -> bool {
+    false
+}
+
+fn default_health_path() -> String {
+    "/health".to_string()
+}
+
+fn default_ready_path() -> String {
+    "/ready".to_string()
+}
+
+fn default_stats_path() -> String {
+    "/stats".to_string()
+}
+
+// Auto TLS config defaults
+fn default_auto_tls_enabled() -> bool {
+    false
+}
+
+fn default_challenge_type() -> String {
+    "http-01".to_string()
+}
+
+fn default_cache_dir() -> String {
+    "./certs".to_string()
+}
+
+fn default_renew_before_days() -> u32 {
+    30
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,5 +400,207 @@ mod tests {
     fn test_health_check_config() {
         let config = Config::default();
         assert!(config.enable_health_check);
+    }
+
+    #[test]
+    fn test_management_config_default() {
+        let config = Config::default();
+        assert!(config.management.is_none());
+    }
+
+    #[test]
+    fn test_auto_tls_config_default() {
+        let config = Config::default();
+        assert!(config.auto_tls.is_none());
+    }
+
+    #[test]
+    fn test_management_config_deserialize() {
+        let toml = r#"
+            [management]
+            enabled = true
+            health_path = "/health"
+            ready_path = "/ready"
+            stats_path = "/stats"
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let mgmt = config.management.unwrap();
+        assert!(mgmt.enabled);
+        assert_eq!(mgmt.health_path, "/health");
+        assert_eq!(mgmt.ready_path, "/ready");
+        assert_eq!(mgmt.stats_path, "/stats");
+    }
+
+    #[test]
+    fn test_management_config_partial() {
+        let toml = r#"
+            [management]
+            enabled = true
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let mgmt = config.management.unwrap();
+        assert!(mgmt.enabled);
+        assert_eq!(mgmt.health_path, "/health"); // default
+        assert_eq!(mgmt.ready_path, "/ready"); // default
+        assert_eq!(mgmt.stats_path, "/stats"); // default
+    }
+
+    #[test]
+    fn test_auto_tls_config_deserialize() {
+        let toml = r#"
+            [auto_tls]
+            enabled = true
+            domains = ["example.com", "www.example.com"]
+            email = "admin@example.com"
+            challenge_type = "http-01"
+            cache_dir = "./certs"
+            renew_before_days = 30
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let auto_tls = config.auto_tls.unwrap();
+        assert!(auto_tls.enabled);
+        assert_eq!(auto_tls.domains, vec!["example.com", "www.example.com"]);
+        assert_eq!(auto_tls.email, "admin@example.com");
+        assert_eq!(auto_tls.challenge_type, "http-01");
+        assert_eq!(auto_tls.cache_dir, "./certs");
+        assert_eq!(auto_tls.renew_before_days, 30);
+    }
+
+    #[test]
+    fn test_auto_tls_config_partial() {
+        let toml = r#"
+            [auto_tls]
+            enabled = true
+            domains = ["example.com"]
+            email = "admin@example.com"
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let auto_tls = config.auto_tls.unwrap();
+        assert!(auto_tls.enabled);
+        assert_eq!(auto_tls.domains, vec!["example.com"]);
+        assert_eq!(auto_tls.email, "admin@example.com");
+        assert_eq!(auto_tls.challenge_type, "http-01"); // default
+        assert_eq!(auto_tls.cache_dir, "./certs"); // default
+        assert_eq!(auto_tls.renew_before_days, 30); // default
+    }
+
+    #[test]
+    fn test_management_config_custom_paths() {
+        let toml = r#"
+            [management]
+            enabled = true
+            health_path = "/api/health"
+            ready_path = "/api/ready"
+            stats_path = "/api/stats"
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let mgmt = config.management.unwrap();
+        assert_eq!(mgmt.health_path, "/api/health");
+        assert_eq!(mgmt.ready_path, "/api/ready");
+        assert_eq!(mgmt.stats_path, "/api/stats");
+    }
+
+    #[test]
+    fn test_auto_tls_dns_challenge() {
+        let toml = r#"
+            [auto_tls]
+            enabled = true
+            domains = ["example.com"]
+            email = "admin@example.com"
+            challenge_type = "dns-01"
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let auto_tls = config.auto_tls.unwrap();
+        assert_eq!(auto_tls.challenge_type, "dns-01");
+    }
+
+    #[test]
+    fn test_management_config_equality() {
+        let config1 = ManagementConfig {
+            enabled: true,
+            health_path: "/health".to_string(),
+            ready_path: "/ready".to_string(),
+            stats_path: "/stats".to_string(),
+        };
+        let config2 = ManagementConfig {
+            enabled: true,
+            health_path: "/health".to_string(),
+            ready_path: "/ready".to_string(),
+            stats_path: "/stats".to_string(),
+        };
+        assert_eq!(config1, config2);
+    }
+
+    #[test]
+    fn test_auto_tls_config_equality() {
+        let config1 = AutoTlsConfig {
+            enabled: true,
+            domains: vec!["example.com".to_string()],
+            email: "admin@example.com".to_string(),
+            challenge_type: "http-01".to_string(),
+            cache_dir: "./certs".to_string(),
+            renew_before_days: 30,
+        };
+        let config2 = AutoTlsConfig {
+            enabled: true,
+            domains: vec!["example.com".to_string()],
+            email: "admin@example.com".to_string(),
+            challenge_type: "http-01".to_string(),
+            cache_dir: "./certs".to_string(),
+            renew_before_days: 30,
+        };
+        assert_eq!(config1, config2);
+    }
+
+    #[test]
+    fn test_config_with_both_management_and_auto_tls() {
+        let toml = r#"
+            [management]
+            enabled = true
+            [auto_tls]
+            enabled = true
+            domains = ["example.com"]
+            email = "admin@example.com"
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(config.management.as_ref().unwrap().enabled);
+        assert!(config.auto_tls.as_ref().unwrap().enabled);
+    }
+
+    #[test]
+    fn test_management_config_disabled() {
+        let toml = r#"
+            [management]
+            enabled = false
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(!config.management.unwrap().enabled);
+    }
+
+    #[test]
+    fn test_auto_tls_multiple_domains() {
+        let toml = r#"
+            [auto_tls]
+            enabled = true
+            domains = ["example.com", "www.example.com", "api.example.com"]
+            email = "admin@example.com"
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let auto_tls = config.auto_tls.unwrap();
+        assert_eq!(auto_tls.domains.len(), 3);
+    }
+
+    #[test]
+    fn test_auto_tls_custom_renew_days() {
+        let toml = r#"
+            [auto_tls]
+            enabled = true
+            domains = ["example.com"]
+            email = "admin@example.com"
+            renew_before_days = 14
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        let auto_tls = config.auto_tls.unwrap();
+        assert_eq!(auto_tls.renew_before_days, 14);
     }
 }

@@ -3,6 +3,7 @@
 //! A high-performance, secure HTTP static file server built with Rust.
 
 pub mod access_log;
+pub mod auto_tls;
 pub mod basic_auth;
 pub mod config;
 pub mod config_reloader;
@@ -11,6 +12,7 @@ pub mod error_pages;
 pub mod file_service;
 pub mod file_upload;
 pub mod handler;
+pub mod management;
 pub mod memory_cache;
 pub mod metrics;
 pub mod middleware;
