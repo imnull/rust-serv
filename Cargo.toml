@@ -51,7 +51,7 @@ rustls = { version = "0.23", features = ["ring", "std"] }
 instant-acme = "0.7"
 x509-parser = "0.16"
 rustls-pki-types = "1"
-rcgen = "0.13"
+rcgen = "0.14"
 
 # Error handling
 anyhow = "1.0"
@@ -75,7 +75,7 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-feature
 tempfile = "3.14"
 proptest = "1.5"
 criterion = "0.5"
-rcgen = "0.13"
+rcgen = "0.14"
 
 [profile.release]
 opt-level = 3
