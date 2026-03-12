@@ -31,7 +31,7 @@ toml = "0.8"
 urlencoding = "2.1"
 
 # File system watching
-notify = "7.0"
+notify = "8.2"
 
 # MIME types
 mime_guess = "2.0"
