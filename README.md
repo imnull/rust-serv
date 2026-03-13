@@ -1,13 +1,15 @@
 # Rust HTTP 静态服务器
 
 [![Crates.io](https://img.shields.io/crates/v/rust-serv.svg)](https://crates.io/crates/rust-serv)
-[![Docker](https://img.shields.io/badge/ghcr.io-imnull%2Frust--serv-blue)](https://github.com/imnull/rust-serv/pkgs/container/rust-serv)
+[![Downloads](https://img.shields.io/crates/d/rust-serv.svg)](https://crates.io/crates/rust-serv)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://imnull.github.io/rust-serv/)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-[English](./README_EN.md) | **中文**
+**简体中文** | [English](./README_EN.md)
 
-一个高性能、安全、功能丰富的 Rust HTTP 静态文件服务器，采用测试驱动开发（TDD）范式开发，测试覆盖率 95%+。
+**🚀 55,000+ 请求/秒 | 3x 快于 nginx | 测试覆盖率 95%+**
+
+一个高性能、安全、功能丰富的 Rust HTTP 静态文件服务器。基于 Hyper + Tokio 构建，采用测试驱动开发（TDD）范式。
 
 ## 📚 文档
 
@@ -55,6 +57,19 @@
 - ✅ **文件上传 (PUT/POST)** - multipart 解析，扩展名/大小限制
 - ✅ **自定义错误页面** - 美观模板，支持 400-504 错误码
 - ✅ **配置热重载** - 零停机配置更新
+
+## ⚡ 性能
+
+rust-serv 在静态文件服务上显著快于 nginx：
+
+| 指标 | nginx 1.29 | rust-serv 0.3 | 提升 |
+|------|-----------|--------------|------|
+| **QPS** | 17,467 | **55,818** | **3.2x** |
+| 平均延迟 | 5.66 ms | **1.74 ms** | **3.3x** |
+| P99 延迟 | 6.67 ms | **3.45 ms** | **1.9x** |
+| 500 并发 QPS | 17,340 | **50,817** | **2.9x** |
+
+详细基准测试：[组件性能](./docs/benchmarks.md) | [vs nginx 对比](./docs/benchmark-vs-nginx.md)
 
 ## 快速开始
 
