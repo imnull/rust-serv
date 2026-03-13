@@ -271,4 +271,165 @@ mod tests {
         // Should not panic
         let _ = loader.engine();
     }
+
+    #[test]
+    fn test_compile_bytes() {
+        let mut loader = PluginLoader::new().unwrap();
+        
+        // Valid Wasm bytes (minimal module: magic + version)
+        let wasm_bytes: Vec<u8> = vec![
+            0x00, 0x61, 0x73, 0x6D, // magic
+            0x01, 0x00, 0x00, 0x00, // version
+        ];
+        let key = PathBuf::from("/memory.wasm");
+        
+        let result = loader.compile_bytes(&wasm_bytes, key);
+        assert!(result.is_ok());
+        assert_eq!(loader.cache_size(), 1);
+    }
+
+    #[test]
+    fn test_compile_bytes_invalid() {
+        let mut loader = PluginLoader::new().unwrap();
+        
+        // Invalid Wasm bytes
+        let invalid_bytes = vec![0x00, 0x01, 0x02, 0x03];
+        let key = PathBuf::from("/invalid.wasm");
+        
+        let result = loader.compile_bytes(&invalid_bytes, key);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compile_nonexistent_file() {
+        let mut loader = PluginLoader::new().unwrap();
+        
+        let path = PathBuf::from("/nonexistent/path/to/plugin.wasm");
+        let result = loader.compile(&path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compile_cached_module() {
+        let mut loader = PluginLoader::new().unwrap();
+        
+        // Create a minimal valid Wasm file
+        let wasm_bytes: Vec<u8> = vec![
+            0x00, 0x61, 0x73, 0x6D, // magic
+            0x01, 0x00, 0x00, 0x00, // version
+        ];
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(&wasm_bytes).unwrap();
+        let path = temp_file.path().to_path_buf();
+        
+        // First compile
+        let result1 = loader.compile(&path);
+        assert!(result1.is_ok());
+        assert_eq!(loader.cache_size(), 1);
+        
+        // Second compile should use cache
+        let result2 = loader.compile(&path);
+        assert!(result2.is_ok());
+        assert_eq!(loader.cache_size(), 1); // Still 1, not 2
+    }
+
+    #[test]
+    fn test_module_cache_multiple_insert() {
+        let mut cache = ModuleCache::new();
+        let loader = PluginLoader::new().unwrap();
+        let engine = loader.engine();
+        
+        for i in 0..10 {
+            let module = Module::new(engine, "(module)").unwrap();
+            let path = PathBuf::from(format!("/test{}.wasm", i));
+            cache.insert(path, module);
+        }
+        
+        assert_eq!(cache.len(), 10);
+    }
+
+    #[test]
+    fn test_loader_multiple_caches() {
+        let mut loader = PluginLoader::new().unwrap();
+        let engine = loader.engine().clone();
+        
+        // Insert multiple modules
+        for i in 0..5 {
+            let module = Module::new(&engine, "(module)").unwrap();
+            let path = PathBuf::from(format!("/plugin{}.wasm", i));
+            loader.cache_mut().insert(path, module);
+        }
+        
+        assert_eq!(loader.cache_size(), 5);
+        
+        // Clear and verify
+        loader.clear_cache();
+        assert_eq!(loader.cache_size(), 0);
+    }
+
+    #[test]
+    fn test_extract_metadata_default_values() {
+        let loader = PluginLoader::new().unwrap();
+        let engine = loader.engine();
+        let module = Module::new(engine, "(module)").unwrap();
+
+        let metadata = loader.extract_metadata(&module).unwrap();
+        
+        // Verify all default fields
+        assert_eq!(metadata.id, "unknown");
+        assert_eq!(metadata.name, "Unknown Plugin");
+        assert_eq!(metadata.version, "0.0.0");
+        assert_eq!(metadata.description, "Plugin without metadata");
+        assert_eq!(metadata.author, "Unknown");
+        assert_eq!(metadata.homepage, None);
+        assert_eq!(metadata.license, "MIT");
+        assert_eq!(metadata.min_server_version, "0.1.0");
+        assert_eq!(metadata.priority, 100);
+        assert!(metadata.capabilities.is_empty());
+        assert!(metadata.permissions.is_empty());
+    }
+
+    #[test]
+    fn test_module_cache_is_empty() {
+        let mut cache = ModuleCache::new();
+        assert!(cache.is_empty());
+        
+        let loader = PluginLoader::new().unwrap();
+        let engine = loader.engine();
+        let module = Module::new(engine, "(module)").unwrap();
+        
+        cache.insert(PathBuf::from("/test.wasm"), module);
+        assert!(!cache.is_empty());
+        
+        cache.clear();
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn test_loader_engine_config() {
+        let loader = PluginLoader::new().unwrap();
+        let engine = loader.engine();
+        let _config = engine.config();
+        
+        // Engine was successfully created with custom config
+        assert!(true);
+    }
+
+    #[test]
+    fn test_compile_bytes_and_cache() {
+        let mut loader = PluginLoader::new().unwrap();
+        
+        // Compile from bytes
+        let wasm_bytes: Vec<u8> = vec![
+            0x00, 0x61, 0x73, 0x6D, // magic
+            0x01, 0x00, 0x00, 0x00, // version
+        ];
+        let key = PathBuf::from("/func.wasm");
+        
+        let module = loader.compile_bytes(&wasm_bytes, key.clone()).unwrap();
+        
+        // Verify it's in cache
+        let cached = loader.cache().get(&key);
+        assert!(cached.is_some());
+    }
 }

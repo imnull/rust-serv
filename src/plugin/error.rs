@@ -275,4 +275,40 @@ mod tests {
         assert!(!PluginError::NotFound("".into()).is_timeout());
         assert!(!PluginError::ExecutionError("".into()).is_timeout());
     }
+
+    #[test]
+    fn test_error_other_constructor() {
+        let err = PluginError::other("custom error message");
+        assert!(matches!(err, PluginError::Other(_)));
+        assert_eq!(err.error_code(), 9999);
+    }
+
+    #[test]
+    fn test_error_from_io() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
+        let plugin_err: PluginError = io_err.into();
+        assert!(matches!(plugin_err, PluginError::Io(_)));
+    }
+
+    #[test]
+    fn test_error_from_json() {
+        let json_err = serde_json::from_str::<serde_json::Value>("{invalid}").unwrap_err();
+        let plugin_err: PluginError = json_err.into();
+        assert!(matches!(plugin_err, PluginError::Json(_)));
+    }
+
+    #[test]
+    fn test_error_display() {
+        let err = PluginError::Timeout(5000);
+        let msg = format!("{}", err);
+        assert!(msg.contains("5000"));
+        assert!(msg.contains("timeout"));
+    }
+
+    #[test]
+    fn test_error_debug() {
+        let err = PluginError::NotFound("test_plugin".to_string());
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("NotFound"));
+    }
 }

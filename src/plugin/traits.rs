@@ -296,4 +296,245 @@ mod tests {
         
         assert_eq!(original, decoded);
     }
+
+    #[test]
+    fn test_plugin_metadata_serialization() {
+        let metadata = PluginMetadata {
+            id: "test-plugin".to_string(),
+            name: "Test Plugin".to_string(),
+            version: "1.0.0".to_string(),
+            description: "A test plugin".to_string(),
+            author: "Test Author".to_string(),
+            homepage: Some("https://example.com".to_string()),
+            license: "MIT".to_string(),
+            min_server_version: "0.1.0".to_string(),
+            priority: 100,
+            capabilities: vec![],
+            permissions: vec![],
+        };
+
+        let json = serde_json::to_string(&metadata).unwrap();
+        let deserialized: PluginMetadata = serde_json::from_str(&json).unwrap();
+        
+        assert_eq!(metadata.id, deserialized.id);
+        assert_eq!(metadata.name, deserialized.name);
+    }
+
+    #[test]
+    fn test_plugin_config_default() {
+        let config = PluginConfig::default();
+        
+        assert!(config.enabled);
+        assert_eq!(config.priority, None);
+        assert_eq!(config.timeout_ms, Some(100));
+        assert!(config.custom.is_empty());
+    }
+
+    #[test]
+    fn test_plugin_config_get_nonexistent() {
+        let config = PluginConfig::default();
+        let result: Option<String> = config.get("nonexistent");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_plugin_request_header() {
+        let mut headers = HashMap::new();
+        headers.insert("content-type".to_string(), "application/json".to_string());
+        
+        let request = PluginRequest {
+            method: "GET".to_string(),
+            path: "/test".to_string(),
+            query: HashMap::new(),
+            headers,
+            body: None,
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "test-1".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+
+        assert_eq!(request.header("Content-Type"), Some(&"application/json".to_string()));
+        assert_eq!(request.header("CONTENT-TYPE"), Some(&"application/json".to_string()));
+        assert_eq!(request.header("authorization"), None);
+    }
+
+    #[test]
+    fn test_plugin_request_query_param() {
+        let mut query = HashMap::new();
+        query.insert("page".to_string(), "2".to_string());
+        query.insert("limit".to_string(), "10".to_string());
+        
+        let request = PluginRequest {
+            method: "GET".to_string(),
+            path: "/users".to_string(),
+            query,
+            headers: HashMap::new(),
+            body: None,
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "test-2".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+
+        assert_eq!(request.query_param("page"), Some(&"2".to_string()));
+        assert_eq!(request.query_param("limit"), Some(&"10".to_string()));
+        assert_eq!(request.query_param("sort"), None);
+    }
+
+    #[test]
+    fn test_plugin_response_status_codes() {
+        assert_eq!(PluginResponse::ok().status, 200);
+        assert_eq!(PluginResponse::not_found().status, 404);
+        assert_eq!(PluginResponse::internal_error().status, 500);
+        assert_eq!(PluginResponse::new(201).status, 201);
+    }
+
+    #[test]
+    fn test_plugin_response_with_methods() {
+        let response = PluginResponse::ok()
+            .with_header("X-Request-Id", "12345")
+            .with_header("X-Rate-Limit", "100")
+            .with_body("Response body");
+
+        assert_eq!(response.status, 200);
+        assert_eq!(response.headers.len(), 2);
+        assert_eq!(response.body, Some("Response body".to_string()));
+    }
+
+    #[test]
+    fn test_plugin_response_json() {
+        #[derive(Serialize)]
+        struct TestData {
+            message: String,
+            count: i32,
+        }
+
+        let data = TestData {
+            message: "Hello".to_string(),
+            count: 42,
+        };
+
+        let response = PluginResponse::ok().json(&data).unwrap();
+
+        assert_eq!(response.headers.get("content-type"), Some(&"application/json".to_string()));
+        assert!(response.body.is_some());
+    }
+
+    #[test]
+    fn test_plugin_action_continue() {
+        let action = PluginAction::Continue;
+        let json = serde_json::to_string(&action).unwrap();
+        let deserialized: PluginAction = serde_json::from_str(&json).unwrap();
+        
+        assert!(matches!(deserialized, PluginAction::Continue));
+    }
+
+    #[test]
+    fn test_plugin_action_intercept() {
+        let response = PluginResponse::ok();
+        let action = PluginAction::Intercept(response);
+        let json = serde_json::to_string(&action).unwrap();
+        let deserialized: PluginAction = serde_json::from_str(&json).unwrap();
+        
+        assert!(matches!(deserialized, PluginAction::Intercept(_)));
+    }
+
+    #[test]
+    fn test_plugin_action_error() {
+        let action = PluginAction::Error {
+            message: "Something went wrong".to_string(),
+        };
+        let json = serde_json::to_string(&action).unwrap();
+        let deserialized: PluginAction = serde_json::from_str(&json).unwrap();
+        
+        if let PluginAction::Error { message } = deserialized {
+            assert_eq!(message, "Something went wrong");
+        } else {
+            panic!("Expected Error variant");
+        }
+    }
+
+    #[test]
+    fn test_base64_empty() {
+        let original = "";
+        let encoded = base64_encode(original);
+        let decoded = base64_decode(&encoded).unwrap();
+        
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_base64_unicode() {
+        let original = "你好世界 🌍";
+        let encoded = base64_encode(original);
+        let decoded = base64_decode(&encoded).unwrap();
+        
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_base64_decode_invalid() {
+        let invalid = "!!!not-valid-base64!!!";
+        let result = base64_decode(invalid);
+        
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_plugin_request_serialization() {
+        let request = PluginRequest {
+            method: "POST".to_string(),
+            path: "/api/test".to_string(),
+            query: [("key".to_string(), "value".to_string())].into_iter().collect(),
+            headers: [("content-type".to_string(), "application/json".to_string())].into_iter().collect(),
+            body: Some("test body".to_string()),
+            client_ip: "192.168.1.1".to_string(),
+            request_id: "req-123".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "example.com".to_string(),
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        let deserialized: PluginRequest = serde_json::from_str(&json).unwrap();
+        
+        assert_eq!(request.method, deserialized.method);
+        assert_eq!(request.path, deserialized.path);
+    }
+
+    #[test]
+    fn test_plugin_response_serialization() {
+        let response = PluginResponse {
+            status: 200,
+            headers: [("x-custom".to_string(), "value".to_string())].into_iter().collect(),
+            body: Some("response body".to_string()),
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        let deserialized: PluginResponse = serde_json::from_str(&json).unwrap();
+        
+        assert_eq!(response.status, deserialized.status);
+        assert_eq!(response.headers.len(), deserialized.headers.len());
+    }
+
+    #[test]
+    fn test_plugin_metadata_default() {
+        let metadata = PluginMetadata {
+            id: "test".to_string(),
+            name: "Test".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Test".to_string(),
+            author: "Test".to_string(),
+            homepage: None,
+            license: "MIT".to_string(),
+            min_server_version: "0.1.0".to_string(),
+            priority: 100,
+            capabilities: vec![Capability::ModifyRequest],
+            permissions: vec![Permission::ReadEnv { allowed: vec!["PATH".to_string()] }],
+        };
+
+        assert_eq!(metadata.id, "test");
+        assert!(metadata.homepage.is_none());
+        assert_eq!(metadata.capabilities.len(), 1);
+    }
 }

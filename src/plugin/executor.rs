@@ -446,4 +446,159 @@ mod tests {
         let result = WasmExecutor::add_host_functions(&mut linker);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_executor_state_debug() {
+        let state = ExecutorState::default();
+        let debug_str = format!("{:?}", state);
+        assert!(debug_str.contains("ExecutorState"));
+    }
+
+    #[test]
+    fn test_executor_state_last_action() {
+        let state = ExecutorState::default();
+        assert!(state.last_action.is_none());
+    }
+
+    #[test]
+    fn test_executor_with_large_request() {
+        let engine = test_engine();
+        let module = minimal_wasm_module(&engine);
+        let config = PluginConfig::default();
+
+        let mut executor = WasmExecutor::new(&engine, module, &config).unwrap();
+
+        // Create a large request with many headers
+        let mut headers = HashMap::new();
+        for i in 0..100 {
+            headers.insert(format!("header-{}", i), format!("value-{}", i));
+        }
+
+        let request = PluginRequest {
+            method: "POST".to_string(),
+            path: "/large-request".to_string(),
+            query: HashMap::new(),
+            headers,
+            body: Some("x".repeat(10000)),
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "large-req".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "example.com".to_string(),
+        };
+
+        assert!(executor.on_request(&request).is_ok());
+    }
+
+    #[test]
+    fn test_executor_with_unicode_data() {
+        let engine = test_engine();
+        let module = minimal_wasm_module(&engine);
+        let config = PluginConfig::default();
+
+        let mut executor = WasmExecutor::new(&engine, module, &config).unwrap();
+
+        let mut headers = HashMap::new();
+        headers.insert("Content-Type".to_string(), "text/plain; charset=utf-8".to_string());
+
+        let request = PluginRequest {
+            method: "POST".to_string(),
+            path: "/unicode/你好世界/日本語/🌍".to_string(),
+            query: HashMap::new(),
+            headers,
+            body: Some("Unicode: 你好世界 🎉".to_string()),
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "unicode-req".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "example.com".to_string(),
+        };
+
+        assert!(executor.on_request(&request).is_ok());
+    }
+
+    #[test]
+    fn test_executor_with_empty_body() {
+        let engine = test_engine();
+        let module = minimal_wasm_module(&engine);
+        let config = PluginConfig::default();
+
+        let mut executor = WasmExecutor::new(&engine, module, &config).unwrap();
+
+        let request = PluginRequest {
+            method: "GET".to_string(),
+            path: "/no-body".to_string(),
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            body: None,
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "no-body-req".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+
+        let action = executor.on_request(&request).unwrap();
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[test]
+    fn test_executor_memory_size() {
+        let engine = test_engine();
+        let module = minimal_wasm_module(&engine);
+        let config = PluginConfig::default();
+
+        let executor = WasmExecutor::new(&engine, module, &config).unwrap();
+
+        // Memory should be available
+        let size = executor.memory.size(&executor.store);
+        assert!(size > 0);
+    }
+
+    #[test]
+    fn test_executor_with_response_variants() {
+        let engine = test_engine();
+        let module = minimal_wasm_module(&engine);
+        let config = PluginConfig::default();
+
+        let mut executor = WasmExecutor::new(&engine, module, &config).unwrap();
+
+        // Test different response types
+        let responses = vec![
+            PluginResponse::ok(),
+            PluginResponse::not_found(),
+            PluginResponse::internal_error(),
+            PluginResponse {
+                status: 201,
+                headers: HashMap::new(),
+                body: Some("Created".to_string()),
+            },
+        ];
+
+        for response in responses {
+            let action = executor.on_response(&response);
+            assert!(action.is_ok());
+        }
+    }
+
+    #[test]
+    fn test_executor_with_config_timeout() {
+        let engine = test_engine();
+        let module = minimal_wasm_module(&engine);
+
+        let mut config = PluginConfig::default();
+        config.timeout_ms = Some(5000);
+
+        let executor = WasmExecutor::new(&engine, module, &config);
+        assert!(executor.is_ok());
+    }
+
+    #[test]
+    fn test_executor_with_config_disabled() {
+        let engine = test_engine();
+        let module = minimal_wasm_module(&engine);
+
+        let mut config = PluginConfig::default();
+        config.enabled = false;
+
+        let executor = WasmExecutor::new(&engine, module, &config);
+        assert!(executor.is_ok());
+    }
 }

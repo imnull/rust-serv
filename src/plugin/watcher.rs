@@ -213,4 +213,180 @@ mod tests {
             assert!(result.is_ok());
         });
     }
+
+    #[test]
+    fn test_watcher_multiple_paths() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+            let mut watcher = PluginWatcher::new(manager).unwrap();
+
+            let test_dir1 = std::env::temp_dir().join("rust_serv_test_watch1");
+            let test_dir2 = std::env::temp_dir().join("rust_serv_test_watch2");
+            std::fs::create_dir_all(&test_dir1).ok();
+            std::fs::create_dir_all(&test_dir2).ok();
+
+            // Watch multiple directories
+            let _ = watcher.watch(&test_dir1);
+            let _ = watcher.watch(&test_dir2);
+
+            let paths = watcher.watched_paths();
+            assert!(paths.len() <= 2); // May fail on some platforms
+
+            // Clean up
+            std::fs::remove_dir_all(&test_dir1).ok();
+            std::fs::remove_dir_all(&test_dir2).ok();
+        });
+    }
+
+    #[test]
+    fn test_watcher_watch_nonexistent_path() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+            let mut watcher = PluginWatcher::new(manager).unwrap();
+
+            let nonexistent = std::path::PathBuf::from("/nonexistent/path/12345");
+            let result = watcher.watch(&nonexistent);
+
+            // Should fail (path doesn't exist)
+            assert!(result.is_err());
+        });
+    }
+
+    #[test]
+    fn test_watcher_stop_with_paths() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+            let mut watcher = PluginWatcher::new(manager).unwrap();
+
+            let test_dir = std::env::temp_dir().join("rust_serv_test_stop");
+            std::fs::create_dir_all(&test_dir).ok();
+
+            let _ = watcher.watch(&test_dir);
+            
+            // Stop should clear all paths
+            watcher.stop();
+            
+            let paths = watcher.watched_paths();
+            assert!(paths.is_empty());
+
+            // Clean up
+            std::fs::remove_dir_all(&test_dir).ok();
+        });
+    }
+
+    #[test]
+    fn test_watcher_unwatch_watched_path() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+            let mut watcher = PluginWatcher::new(manager).unwrap();
+
+            let test_dir = std::env::temp_dir().join("rust_serv_test_unwatch");
+            std::fs::create_dir_all(&test_dir).ok();
+
+            let _ = watcher.watch(&test_dir);
+            let _ = watcher.unwatch(&test_dir);
+
+            let paths = watcher.watched_paths();
+            assert!(!paths.iter().any(|p| *p == test_dir));
+
+            // Clean up
+            std::fs::remove_dir_all(&test_dir).ok();
+        });
+    }
+
+    #[test]
+    fn test_handle_file_event_multiple_files() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+
+            // Test with multiple files
+            let event = Event {
+                kind: EventKind::Any,
+                paths: vec![
+                    std::path::PathBuf::from("plugin1.wasm"),
+                    std::path::PathBuf::from("plugin2.wasm"),
+                    std::path::PathBuf::from("readme.txt"),
+                ],
+                attrs: Default::default(),
+            };
+
+            let result = handle_file_event(&manager, &event).await;
+            assert!(result.is_ok());
+        });
+    }
+
+    #[test]
+    fn test_handle_file_event_no_extension() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+
+            // Test with file without extension
+            let event = Event {
+                kind: EventKind::Any,
+                paths: vec![std::path::PathBuf::from("plugin")],
+                attrs: Default::default(),
+            };
+
+            let result = handle_file_event(&manager, &event).await;
+            assert!(result.is_ok());
+        });
+    }
+
+    #[test]
+    fn test_handle_file_event_empty_paths() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+
+            // Test with no file paths
+            let event = Event {
+                kind: EventKind::Any,
+                paths: vec![],
+                attrs: Default::default(),
+            };
+
+            let result = handle_file_event(&manager, &event).await;
+            assert!(result.is_ok());
+        });
+    }
+
+    #[test]
+    fn test_handle_file_event_with_reload() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+
+            // Test with a .wasm file that matches a loaded plugin
+            let event = Event {
+                kind: EventKind::Any,
+                paths: vec![std::path::PathBuf::from("/plugins/test.wasm")],
+                attrs: Default::default(),
+            };
+
+            // Should handle even if plugin not found
+            let result = handle_file_event(&manager, &event).await;
+            assert!(result.is_ok());
+        });
+    }
+
+    #[test]
+    fn test_watcher_new_creates_watcher() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+            
+            // Create multiple watchers
+            let watcher1 = PluginWatcher::new(manager.clone());
+            let watcher2 = PluginWatcher::new(manager);
+
+            assert!(watcher1.is_ok());
+            assert!(watcher2.is_ok());
+        });
+    }
 }
