@@ -14,6 +14,10 @@
   - [English](/en/configuration.md)
   - [中文](/configuration.md)
 
+- **Benchmarks**
+  - [Component Benchmarks](/benchmarks.md)
+  - [vs nginx](/benchmark-vs-nginx.md)
+
 - **Links**
   - [GitHub](https://github.com/imnull/rust-serv)
   - [Crates.io](https://crates.io/crates/rust-serv)
