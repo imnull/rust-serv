@@ -1,7 +1,6 @@
 # Build stage
 FROM rust:1.82 AS builder
 
-# Install build dependencies for native crates like ring
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
@@ -10,17 +9,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy all source files
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
-# Build release binary
 RUN cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
 
-# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
@@ -31,7 +27,6 @@ WORKDIR /app
 
 COPY --from=builder /app/target/release/rust-serv /usr/local/bin/rust-serv
 
-# Create directories and copy default config
 RUN mkdir -p /var/www/html /etc/rust-serv
 COPY docker/config.toml /etc/rust-serv/config.toml
 
