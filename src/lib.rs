@@ -18,6 +18,7 @@ pub mod metrics;
 pub mod middleware;
 pub mod mime_types;
 pub mod path_security;
+pub mod plugin;  // Plugin system
 pub mod proxy;
 pub mod server;
 pub mod throttle;
