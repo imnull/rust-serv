@@ -1,7 +1,7 @@
 # Build stage
 FROM rust:1.82 AS builder
 
-# Install build dependencies
+# Install build dependencies for native crates like ring
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
@@ -14,12 +14,13 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
-# Build
+# Build release binary
 RUN cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
 
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
