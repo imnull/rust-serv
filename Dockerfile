@@ -1,10 +1,15 @@
 # Build stage
 FROM rust:1.82 AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install ALL build dependencies that might be needed
+RUN apt-get update && \
+    apt-get install -y \
     build-essential \
     pkg-config \
     libssl-dev \
+    clang \
+    cmake \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -14,10 +19,11 @@ COPY src ./src
 
 RUN cargo build --release
 
-# Runtime stage
+# Runtime stage  
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
     libssl3 \
