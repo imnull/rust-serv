@@ -198,16 +198,110 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
-    fn test_host_log() {
-        // Should not panic
-        HostFunctions::host_log(1, "Test message");
+    fn test_host_log_debug() {
+        HostFunctions::host_log(0, "Debug message");
     }
-    
+
     #[test]
-    fn test_host_get_config() {
-        let result = HostFunctions::host_get_config("nonexistent");
+    fn test_host_log_info() {
+        HostFunctions::host_log(1, "Info message");
+    }
+
+    #[test]
+    fn test_host_log_warn() {
+        HostFunctions::host_log(2, "Warning message");
+    }
+
+    #[test]
+    fn test_host_log_error() {
+        HostFunctions::host_log(3, "Error message");
+    }
+
+    #[test]
+    fn test_host_log_unknown_level() {
+        HostFunctions::host_log(99, "Unknown level");
+    }
+
+    #[test]
+    fn test_host_log_empty_message() {
+        HostFunctions::host_log(1, "");
+    }
+
+    #[test]
+    fn test_host_log_unicode() {
+        HostFunctions::host_log(1, "你好世界 🌍");
+    }
+
+    #[test]
+    fn test_host_get_config_nonexistent() {
+        let result = HostFunctions::host_get_config("nonexistent_key");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_host_get_config_empty() {
+        let result = HostFunctions::host_get_config("");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_host_set_header() {
+        HostFunctions::host_set_header("X-Custom", "value");
+    }
+
+    #[test]
+    fn test_host_set_header_empty() {
+        HostFunctions::host_set_header("", "");
+    }
+
+    #[test]
+    fn test_host_metrics_counter() {
+        HostFunctions::host_metrics_counter("test_counter", 1.0);
+    }
+
+    #[test]
+    fn test_host_metrics_counter_zero() {
+        HostFunctions::host_metrics_counter("zero_counter", 0.0);
+    }
+
+    #[test]
+    fn test_host_metrics_counter_negative() {
+        HostFunctions::host_metrics_counter("negative_counter", -1.0);
+    }
+
+    #[test]
+    fn test_host_metrics_gauge() {
+        HostFunctions::host_metrics_gauge("test_gauge", 42.5);
+    }
+
+    #[test]
+    fn test_host_metrics_gauge_zero() {
+        HostFunctions::host_metrics_gauge("zero_gauge", 0.0);
+    }
+
+    #[test]
+    fn test_define_host_functions() {
+        let engine = Engine::default();
+        let mut linker = Linker::new(&engine);
+
+        let result = define_host_functions(&mut linker);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_multiple_log_calls() {
+        for level in 0..4 {
+            HostFunctions::host_log(level, &format!("Level {} test", level));
+        }
+    }
+
+    #[test]
+    fn test_multiple_metric_calls() {
+        for i in 0..10 {
+            HostFunctions::host_metrics_counter(&format!("counter_{}", i), i as f64);
+            HostFunctions::host_metrics_gauge(&format!("gauge_{}", i), i as f64 * 0.5);
+        }
     }
 }
