@@ -1,0 +1,7 @@
+[2m2026-03-13T12:05:40.533729Z[0m [32m INFO[0m [2mcargo_tarpaulin::config[0m[2m:[0m Creating config
+[2m2026-03-13T12:05:41.860793Z[0m [32m INFO[0m [2mcargo_tarpaulin[0m[2m:[0m Running Tarpaulin
+[2m2026-03-13T12:05:41.860810Z[0m [32m INFO[0m [2mcargo_tarpaulin[0m[2m:[0m Building project
+[2m2026-03-13T12:05:41.861369Z[0m [32m INFO[0m [2mcargo_tarpaulin::cargo[0m[2m:[0m Cleaning project
+[2m2026-03-13T12:05:50.908138Z[0m [31mERROR[0m [2mcargo_tarpaulin[0m[2m:[0m Cargo failed to run! Error: `cargo metadata` exited with an error: error: the package 'rust-serv' does not contain this feature: plugin
+
+Error: "Cargo failed to run! Error: `cargo metadata` exited with an error: error: the package 'rust-serv' does not contain this feature: plugin\n"

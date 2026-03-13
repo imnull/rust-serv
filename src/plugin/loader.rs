@@ -150,26 +150,125 @@ impl Default for PluginLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+    use tempfile::NamedTempFile;
+    use std::io::Write;
+
     #[test]
     fn test_loader_creation() {
         let loader = PluginLoader::new();
         assert!(loader.is_ok());
     }
-    
+
     #[test]
     fn test_module_cache() {
         let mut cache = ModuleCache::new();
         assert_eq!(cache.len(), 0);
-        
+        assert!(cache.is_empty());
+
         let loader = PluginLoader::new().unwrap();
         let engine = loader.engine();
         let module = Module::new(engine, "(module)").unwrap();
-        
+
         cache.insert(PathBuf::from("/test.wasm"), module);
         assert_eq!(cache.len(), 1);
-        
+        assert!(!cache.is_empty());
+
         cache.clear();
         assert_eq!(cache.len(), 0);
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn test_module_cache_get() {
+        let mut cache = ModuleCache::new();
+        let loader = PluginLoader::new().unwrap();
+        let engine = loader.engine();
+        let module = Module::new(engine, "(module)").unwrap();
+
+        let path = PathBuf::from("/test.wasm");
+        cache.insert(path.clone(), module);
+
+        assert!(cache.get(&path).is_some());
+        assert!(cache.get(&PathBuf::from("/nonexistent.wasm")).is_none());
+    }
+
+    #[test]
+    fn test_module_cache_remove() {
+        let mut cache = ModuleCache::new();
+        let loader = PluginLoader::new().unwrap();
+        let engine = loader.engine();
+        let module = Module::new(engine, "(module)").unwrap();
+
+        let path = PathBuf::from("/test.wasm");
+        cache.insert(path.clone(), module);
+        assert_eq!(cache.len(), 1);
+
+        cache.remove(&path);
+        assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn test_loader_engine() {
+        let loader = PluginLoader::new().unwrap();
+        let engine = loader.engine();
+        // Just verify we can get the engine
+        let _ = engine.config().clone();
+    }
+
+    #[test]
+    fn test_loader_cache() {
+        let loader = PluginLoader::new().unwrap();
+        let cache = loader.cache();
+        assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn test_loader_cache_mut() {
+        let mut loader = PluginLoader::new().unwrap();
+        let cache = loader.cache_mut();
+        assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn test_loader_clear_cache() {
+        let mut loader = PluginLoader::new().unwrap();
+        let engine = loader.engine().clone();
+        let module = Module::new(&engine, "(module)").unwrap();
+        
+        loader.cache_mut().insert(PathBuf::from("/test.wasm"), module);
+        assert_eq!(loader.cache_size(), 1);
+
+        loader.clear_cache();
+        assert_eq!(loader.cache_size(), 0);
+    }
+
+    #[test]
+    fn test_loader_cache_size() {
+        let mut loader = PluginLoader::new().unwrap();
+        assert_eq!(loader.cache_size(), 0);
+
+        let engine = loader.engine().clone();
+        let module = Module::new(&engine, "(module)").unwrap();
+        loader.cache_mut().insert(PathBuf::from("/test.wasm"), module);
+
+        assert_eq!(loader.cache_size(), 1);
+    }
+
+    #[test]
+    fn test_extract_metadata() {
+        let loader = PluginLoader::new().unwrap();
+        let engine = loader.engine();
+        let module = Module::new(engine, "(module)").unwrap();
+
+        let metadata = loader.extract_metadata(&module).unwrap();
+        assert_eq!(metadata.id, "unknown");
+        assert_eq!(metadata.name, "Unknown Plugin");
+    }
+
+    #[test]
+    fn test_loader_default() {
+        let loader = PluginLoader::default();
+        // Should not panic
+        let _ = loader.engine();
     }
 }

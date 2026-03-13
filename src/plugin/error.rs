@@ -103,7 +103,7 @@ impl PluginError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_error_code() {
         let err = PluginError::Timeout(100);
@@ -111,10 +111,168 @@ mod tests {
         assert!(err.is_timeout());
         assert!(err.is_recoverable());
     }
-    
+
     #[test]
     fn test_error_recovery() {
         let err = PluginError::NotFound("test".to_string());
         assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_init_failed() {
+        let err = PluginError::InitFailed("init failed".to_string());
+        assert_eq!(err.error_code(), 1000);
+        assert!(!err.is_recoverable());
+        assert!(!err.is_timeout());
+    }
+
+    #[test]
+    fn test_error_invalid_config() {
+        let err = PluginError::InvalidConfig("bad config".to_string());
+        assert_eq!(err.error_code(), 1001);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_not_found() {
+        let err = PluginError::NotFound("plugin not found".to_string());
+        assert_eq!(err.error_code(), 1002);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_already_loaded() {
+        let err = PluginError::AlreadyLoaded("plugin1".to_string());
+        assert_eq!(err.error_code(), 1003);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_execution_error() {
+        let err = PluginError::ExecutionError("execution failed".to_string());
+        assert_eq!(err.error_code(), 2000);
+        assert!(err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_timeout() {
+        let err = PluginError::Timeout(5000);
+        assert_eq!(err.error_code(), 2001);
+        assert!(err.is_timeout());
+        assert!(err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_permission_denied() {
+        let err = PluginError::PermissionDenied("no access".to_string());
+        assert_eq!(err.error_code(), 3000);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_invalid_input() {
+        let err = PluginError::InvalidInput("bad input".to_string());
+        assert_eq!(err.error_code(), 4000);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_serialization() {
+        let err = PluginError::Serialization("json error".to_string());
+        assert_eq!(err.error_code(), 4001);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_wasm_compilation() {
+        let err = PluginError::WasmCompilation("compile error".to_string());
+        assert_eq!(err.error_code(), 5000);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_wasm_instantiation() {
+        let err = PluginError::WasmInstantiation("instantiate error".to_string());
+        assert_eq!(err.error_code(), 5001);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_host_function() {
+        let err = PluginError::HostFunction("host error".to_string());
+        assert_eq!(err.error_code(), 5002);
+        assert!(err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_watcher_error() {
+        let err = PluginError::WatcherError("watch error".to_string());
+        assert_eq!(err.error_code(), 5003);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_error_io() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let err = PluginError::Io(io_err);
+        assert_eq!(err.error_code(), 6000);
+    }
+
+    #[test]
+    fn test_error_json() {
+        let json_err = serde_json::from_str::<serde_json::Value>("invalid json").unwrap_err();
+        let err = PluginError::Json(json_err);
+        assert_eq!(err.error_code(), 6001);
+    }
+
+    #[test]
+    fn test_error_other() {
+        let err = PluginError::Other("some error".to_string());
+        assert_eq!(err.error_code(), 9999);
+        assert!(!err.is_recoverable());
+    }
+
+    #[test]
+    fn test_all_error_codes_unique() {
+        let codes = vec![
+            PluginError::InitFailed("".into()).error_code(),
+            PluginError::InvalidConfig("".into()).error_code(),
+            PluginError::NotFound("".into()).error_code(),
+            PluginError::AlreadyLoaded("".into()).error_code(),
+            PluginError::ExecutionError("".into()).error_code(),
+            PluginError::Timeout(0).error_code(),
+            PluginError::PermissionDenied("".into()).error_code(),
+            PluginError::InvalidInput("".into()).error_code(),
+            PluginError::Serialization("".into()).error_code(),
+            PluginError::WasmCompilation("".into()).error_code(),
+            PluginError::WasmInstantiation("".into()).error_code(),
+            PluginError::HostFunction("".into()).error_code(),
+            PluginError::WatcherError("".into()).error_code(),
+            PluginError::Other("".into()).error_code(),
+        ];
+
+        // Check all codes are unique
+        let unique_codes: std::collections::HashSet<_> = codes.iter().cloned().collect();
+        assert_eq!(codes.len(), unique_codes.len());
+    }
+
+    #[test]
+    fn test_is_recoverable_variants() {
+        // Recoverable errors
+        assert!(PluginError::Timeout(100).is_recoverable());
+        assert!(PluginError::ExecutionError("".into()).is_recoverable());
+        assert!(PluginError::HostFunction("".into()).is_recoverable());
+
+        // Non-recoverable errors
+        assert!(!PluginError::NotFound("".into()).is_recoverable());
+        assert!(!PluginError::InitFailed("".into()).is_recoverable());
+        assert!(!PluginError::InvalidConfig("".into()).is_recoverable());
+    }
+
+    #[test]
+    fn test_is_timeout_only_timeout() {
+        assert!(PluginError::Timeout(100).is_timeout());
+        assert!(!PluginError::NotFound("".into()).is_timeout());
+        assert!(!PluginError::ExecutionError("".into()).is_timeout());
     }
 }

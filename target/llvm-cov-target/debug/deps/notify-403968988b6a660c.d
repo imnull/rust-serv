@@ -1,0 +1,12 @@
+/Users/kema/git/rust-serv/target/llvm-cov-target/debug/deps/notify-403968988b6a660c.d: /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/lib.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/fsevent.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/null.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/poll.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/config.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/error.rs
+
+/Users/kema/git/rust-serv/target/llvm-cov-target/debug/deps/libnotify-403968988b6a660c.rlib: /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/lib.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/fsevent.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/null.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/poll.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/config.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/error.rs
+
+/Users/kema/git/rust-serv/target/llvm-cov-target/debug/deps/libnotify-403968988b6a660c.rmeta: /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/lib.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/fsevent.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/null.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/poll.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/config.rs /Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/error.rs
+
+/Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/lib.rs:
+/Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/fsevent.rs:
+/Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/null.rs:
+/Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/poll.rs:
+/Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/config.rs:
+/Users/kema/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/notify-7.0.0/src/error.rs:

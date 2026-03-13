@@ -1,0 +1,20 @@
+Writing generated file: /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/settings.rs
+Writing generated file: /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/types.rs
+Writing generated file: /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/opcodes.rs
+Writing generated file: /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/inst_builder.rs
+Writing generated file: /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/settings-x86.rs
+Writing generated file: /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/clif_opt.isle
+Writing generated file: /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/clif_lower.isle
+Rebuilding /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_opt.rs
+Writing ISLE-generated Rust code to /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_opt.rs
+Rebuilding /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_x64.rs
+Writing ISLE-generated Rust code to /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_x64.rs
+Rebuilding /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_aarch64.rs
+Writing ISLE-generated Rust code to /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_aarch64.rs
+Rebuilding /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_s390x.rs
+Writing ISLE-generated Rust code to /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_s390x.rs
+Rebuilding /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_riscv64.rs
+Writing ISLE-generated Rust code to /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_riscv64.rs
+Rebuilding /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_pulley_shared.rs
+Writing ISLE-generated Rust code to /Users/kema/git/rust-serv/target/debug/build/cranelift-codegen-ed0ac67a5de86e3b/out/isle_pulley_shared.rs
+致命错误：不是 git 仓库（或者任何父目录）：.git

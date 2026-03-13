@@ -1,0 +1,222 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    name: AI Review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            **/*.rs
+            **/Cargo.toml
+            **/Cargo.lock
+          files_ignore: |
+            **/*.md
+            **/LICENSE*
+            
+      - name: Setup Rust
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          
+      - name: Run Clippy
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: clippy
+        continue-on-error: true
+        run: |
+          cargo clippy --all-targets --all-features --message-format=json > clippy-output.json 2>&1 || true
+          echo "has_issues=$(test -s clippy-output.json && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          
+      - name: AI Code Review
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          max_tokens: 4096
+          review_mode: true
+          files: ${{ steps.changed-files.outputs.all_changed_files }}
+        continue-on-error: true
+
+  # 备用方案：使用 OpenAI 进行代码审查
+  review-openai:
+    name: AI Review (OpenAI Fallback)
+    runs-on: ubuntu-latest
+    if: failure() || needs.review.result == 'skipped'
+    needs: review
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Get PR diff
+        id: diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }}...HEAD > pr_diff.patch
+          echo "diff_length=$(wc -c < pr_diff.patch)" >> $GITHUB_OUTPUT
+          
+      - name: AI Code Review with OpenAI
+        if: steps.diff.outputs.diff_length != '0'
+        uses: Related-Works/ai-code-review-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          openai_model: "gpt-4o"
+          review_filter: "**/*.rs"
+          max_files: 20
+        continue-on-error: true
+
+  # Rust 特定检查
+  rust-review:
+    name: Rust Quality Review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          
+      - name: Check formatting
+        id: fmt
+        continue-on-error: true
+        run: |
+          cargo fmt --all -- --check 2>&1 | tee fmt-output.txt
+          echo "needs_fmt=$(test -s fmt-output.txt && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          
+      - name: Run Clippy
+        id: clippy
+        continue-on-error: true
+        run: |
+          cargo clippy --all-targets --all-features -- -W clippy::all 2>&1 | tee clippy-output.txt
+          echo "has_warnings=$(grep -c 'warning:' clippy-output.txt || echo '0')" >> $GITHUB_OUTPUT
+          
+      - name: Check for unsafe code
+        id: unsafe
+        run: |
+          UNSAFE_COUNT=$(grep -rn "unsafe" src/ --include="*.rs" | grep -v "// SAFETY" | wc -l || echo "0")
+          echo "unsafe_count=$UNSAFE_COUNT" >> $GITHUB_OUTPUT
+          
+      - name: Check documentation
+        id: docs
+        continue-on-error: true
+        run: |
+          cargo doc --no-deps --all-features 2>&1 | tee doc-output.txt
+          echo "doc_warnings=$(grep -c 'warning:' doc-output.txt || echo '0')" >> $GITHUB_OUTPUT
+          
+      - name: Create Review Comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const formatNeeded = '${{ steps.fmt.outputs.needs_fmt }}' === 'true';
+            const clippyWarnings = '${{ steps.clippy.outputs.has_warnings }}' || '0';
+            const unsafeCount = '${{ steps.unsafe.outputs.unsafe_count }}' || '0';
+            const docWarnings = '${{ steps.docs.outputs.doc_warnings }}' || '0';
+            
+            let comment = '## 🦀 Rust Code Quality Review\n\n';
+            
+            if (formatNeeded) {
+              comment += '### ⚠️ Code Formatting\n';
+              comment += '代码需要格式化。请运行 `cargo fmt --all` 修复格式问题。\n\n';
+            } else {
+              comment += '### ✅ Code Formatting\n格式检查通过\n\n';
+            }
+            
+            if (parseInt(clippyWarnings) > 0) {
+              comment += `### ⚠️ Clippy Warnings (${clippyWarnings})\n`;
+              comment += '检测到 Clippy 警告，建议修复以提高代码质量。\n\n';
+            } else {
+              comment += '### ✅ Clippy\n无 Clippy 警告\n\n';
+            }
+            
+            if (parseInt(unsafeCount) > 0) {
+              comment += `### ⚠️ Unsafe Code (${unsafeCount} occurrences)\n`;
+              comment += '检测到 unsafe 代码块。请确保已添加 `// SAFETY` 注释说明安全性。\n\n';
+            } else {
+              comment += '### ✅ Unsafe Code\n无 unsafe 代码\n\n';
+            }
+            
+            if (parseInt(docWarnings) > 0) {
+              comment += `### ⚠️ Documentation (${docWarnings} warnings)\n`;
+              comment += '文档存在警告，建议补充缺失的文档注释。\n\n';
+            } else {
+              comment += '### ✅ Documentation\n文档检查通过\n\n';
+            }
+            
+            // Get existing comments
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(c => 
+              c.user.type === 'Bot' && 
+              c.body.includes('🦀 Rust Code Quality Review')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+  # 安全审查
+  security-review:
+    name: Security Review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        
+      - name: Security Audit
+        id: audit
+        uses: rustsec/audit-check@v2
+        continue-on-error: true
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Check for sensitive patterns
+        run: |
+          echo "检查敏感信息..."
+          # 检查硬编码密钥
+          ! grep -rn "password\s*=\s*\"" src/ --include="*.rs" 2>/dev/null
+          ! grep -rn "api_key\s*=\s*\"" src/ --include="*.rs" 2>/dev/null
+          ! grep -rn "secret\s*=\s*\"" src/ --include="*.rs" 2>/dev/null
+          
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        if: github.event_name == 'pull_request'
+        continue-on-error: true

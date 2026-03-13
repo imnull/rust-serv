@@ -299,14 +299,6 @@ impl PluginManager {
         self.execution_order = plugins.into_iter().map(|(_, id)| id).collect();
     }
 }
-
-impl Default for PluginManager {
-    fn default() -> Self {
-        Self::new().expect("Failed to create PluginManager")
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 

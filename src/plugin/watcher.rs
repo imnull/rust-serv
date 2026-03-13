@@ -119,6 +119,7 @@ async fn handle_file_event(
 mod tests {
     use super::*;
     use tokio::runtime::Runtime;
+    use std::time::Duration;
 
     #[test]
     fn test_watcher_creation() {
@@ -127,6 +128,89 @@ mod tests {
             let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
             let watcher = PluginWatcher::new(manager);
             assert!(watcher.is_ok());
+        });
+    }
+
+    #[test]
+    fn test_watcher_watch_and_unwatch() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+            let mut watcher = PluginWatcher::new(manager).unwrap();
+
+            let test_dir = std::env::temp_dir().join("rust_serv_test_watch");
+            std::fs::create_dir_all(&test_dir).ok();
+
+            // Test watch
+            let result = watcher.watch(&test_dir);
+            // May fail on some platforms, so just check it doesn't panic
+
+            // Test unwatch
+            let result = watcher.unwatch(&test_dir);
+            // May fail if watch failed, so just check it doesn't panic
+
+            // Clean up
+            std::fs::remove_dir_all(&test_dir).ok();
+        });
+    }
+
+    #[test]
+    fn test_watcher_watched_paths() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+            let watcher = PluginWatcher::new(manager).unwrap();
+
+            let paths = watcher.watched_paths();
+            assert!(paths.is_empty());
+        });
+    }
+
+    #[test]
+    fn test_watcher_stop() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+            let mut watcher = PluginWatcher::new(manager).unwrap();
+
+            // Should not panic
+            watcher.stop();
+        });
+    }
+
+    #[test]
+    fn test_handle_file_event_wasm_file() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+
+            // Test with a .wasm file path
+            let event = Event {
+                kind: EventKind::Any,
+                paths: vec![std::path::PathBuf::from("test.wasm")],
+                attrs: Default::default(),
+            };
+
+            let result = handle_file_event(&manager, &event).await;
+            assert!(result.is_ok());
+        });
+    }
+
+    #[test]
+    fn test_handle_file_event_non_wasm() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let manager = Arc::new(tokio::sync::RwLock::new(PluginManager::new().unwrap()));
+
+            // Test with a non-.wasm file
+            let event = Event {
+                kind: EventKind::Any,
+                paths: vec![std::path::PathBuf::from("test.txt")],
+                attrs: Default::default(),
+            };
+
+            let result = handle_file_event(&manager, &event).await;
+            assert!(result.is_ok());
         });
     }
 }

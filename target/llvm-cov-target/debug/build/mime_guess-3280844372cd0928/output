@@ -1,0 +1,1 @@
+cargo:rustc-env=MIME_TYPES_GENERATED_PATH=/Users/kema/git/rust-serv/target/llvm-cov-target/debug/build/mime_guess-3280844372cd0928/out/mime_types_generated.rs

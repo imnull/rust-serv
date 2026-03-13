@@ -1,0 +1,1 @@
+{"rustc":10849499179769641996,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[10841668541406231005,"build_script_build",false,16950335364945056299]],"local":[{"Precalculated":"27.0.0"}],"rustflags":["-Cdebuginfo=2","-Cstrip=none","--cfg=tarpaulin","-Cinstrument-coverage"],"config":0,"compile_kind":0}
