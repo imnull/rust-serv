@@ -1,0 +1,7 @@
+# Default configuration for Docker
+port = 8080
+host = "0.0.0.0"
+root = "/var/www/html"
+enable_indexing = true
+enable_compression = true
+log_level = "info"

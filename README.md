@@ -1,5 +1,10 @@
 # Rust HTTP 静态服务器
 
+[![Crates.io](https://img.shields.io/crates/v/rust-serv.svg)](https://crates.io/crates/rust-serv)
+[![Docker](https://img.shields.io/badge/ghcr.io-imnull%2Frust--serv-blue)](https://github.com/imnull/rust-serv/pkgs/container/rust-serv)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://imnull.github.io/rust-serv/)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
+
 [English](./README_EN.md) | **中文**
 
 一个高性能、安全、功能丰富的 Rust HTTP 静态文件服务器，采用测试驱动开发（TDD）范式开发，测试覆盖率 95%+。
@@ -55,6 +60,18 @@
 
 ### 安装
 
+**方式一：Cargo（推荐）**
+```bash
+cargo install rust-serv
+```
+
+**方式二：Docker**
+```bash
+docker pull ghcr.io/imnull/rust-serv:latest
+docker run -p 8080:8080 -v /path/to/html:/var/www/html ghcr.io/imnull/rust-serv:latest
+```
+
+**方式三：从源码**
 ```bash
 # 克隆仓库
 git clone https://github.com/imnull/rust-serv.git

@@ -18,8 +18,9 @@ WORKDIR /app
 
 COPY --from=builder /app/target/release/rust_serv /usr/local/bin/rust-serv
 
-# Create default web root
-RUN mkdir -p /var/www/html
+# Create directories and copy default config
+RUN mkdir -p /var/www/html /etc/rust-serv
+COPY docker/config.toml /etc/rust-serv/config.toml
 
 EXPOSE 8080 8443
 
