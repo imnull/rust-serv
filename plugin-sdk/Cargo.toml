@@ -1,0 +1,19 @@
+[package]
+name = "rust-serv-plugin"
+version = "0.1.0"
+edition = "2021"
+authors = ["Marvin <imnull@outlook.com>"]
+description = "Plugin SDK for rust-serv WebAssembly plugins"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/imnull/rust-serv"
+keywords = ["plugin", "wasm", "webassembly", "http", "server"]
+categories = ["web-programming", "wasm"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.22"
+thiserror = "2.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
