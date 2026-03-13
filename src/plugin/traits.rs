@@ -67,9 +67,10 @@ impl PluginConfig {
             T::deserialize(v.clone()).ok()
         })
     }
-    
-    /// Create default configuration
-    pub fn default() -> Self {
+}
+
+impl Default for PluginConfig {
+    fn default() -> Self {
         Self {
             enabled: true,
             priority: None,

@@ -1,4 +1,4 @@
-/target
-/coverage
-/coverage_*
-coverage.json
+# Plugin build artifacts
+plugins/examples/*/target/
+plugins/examples/*/Cargo.lock
+*.wasm
