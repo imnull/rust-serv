@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn test_define_host_functions() {
         let engine = Engine::default();
-        let mut linker = Linker::new(&engine);
+        let mut linker: Linker<()> = Linker::new(&engine);
 
         let result = define_host_functions(&mut linker);
         assert!(result.is_ok());
