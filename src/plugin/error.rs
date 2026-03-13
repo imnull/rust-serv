@@ -41,6 +41,9 @@ pub enum PluginError {
     #[error("Host function error: {0}")]
     HostFunction(String),
     
+    #[error("File watcher error: {0}")]
+    WatcherError(String),
+    
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     
@@ -89,6 +92,7 @@ impl PluginError {
             Self::WasmCompilation(_) => 5000,
             Self::WasmInstantiation(_) => 5001,
             Self::HostFunction(_) => 5002,
+            Self::WatcherError(_) => 5003,
             Self::Io(_) => 6000,
             Self::Json(_) => 6001,
             Self::Other(_) => 9999,

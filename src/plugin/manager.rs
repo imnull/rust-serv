@@ -1,9 +1,9 @@
-//! Plugin manager for lifecycle management
+//! Plugin manager - Simplified implementation
 
 use crate::plugin::{
     error::{PluginError, PluginResult},
     loader::PluginLoader,
-    traits::{PluginConfig, PluginRequest, PluginResponse, PluginAction},
+    traits::{PluginConfig, PluginMetadata, PluginRequest, PluginResponse, PluginAction},
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -13,12 +13,10 @@ use wasmtime::*;
 pub struct LoadedPlugin {
     pub id: String,
     pub path: PathBuf,
-    pub metadata: crate::plugin::PluginMetadata,
+    pub metadata: PluginMetadata,
     pub config: PluginConfig,
-    pub instance: Instance,
-    pub store: Store<HostState>,
+    pub module: Module,
     pub stats: PluginStats,
-    pub functions: PluginFunctions,
 }
 
 /// Plugin statistics
@@ -52,22 +50,6 @@ impl PluginStats {
             self.total_latency_us as f64 / total as f64
         }
     }
-}
-
-/// Host state for Wasm execution
-#[derive(Debug)]
-pub struct HostState {
-    pub request_data: Option<Vec<u8>>,
-    pub response_data: Option<Vec<u8>>,
-    pub action_data: Option<Vec<u8>>,
-}
-
-/// Wasm function references
-pub struct PluginFunctions {
-    pub on_init: Option<TypedFunc<(i32, i32), i32>>,
-    pub on_request: Option<TypedFunc<(i32, i32, i32, i32), i32>>,
-    pub on_response: Option<TypedFunc<(i32, i32, i32, i32), i32>>,
-    pub on_unload: Option<TypedFunc<(), i32>>,
 }
 
 /// Plugin manager
@@ -114,6 +96,72 @@ impl PluginManager {
         })
     }
 
+    /// Load a plugin from file
+    pub fn load(&mut self, path: &Path, config: PluginConfig) -> PluginResult<String> {
+        if !self.config.enabled {
+            return Err(PluginError::InvalidConfig("Plugin system disabled".into()));
+        }
+
+        if self.plugins.len() >= self.config.max_plugins {
+            return Err(PluginError::Other("Maximum plugins reached".into()));
+        }
+
+        // Compile module
+        let module = self.loader.compile(path)?;
+
+        // Extract metadata
+        let metadata = self.loader.extract_metadata(&module)?;
+        let plugin_id = metadata.id.clone();
+
+        // Check if already loaded
+        if self.plugins.contains_key(&plugin_id) {
+            return Err(PluginError::AlreadyLoaded(plugin_id));
+        }
+
+        // Create loaded plugin
+        let loaded = LoadedPlugin {
+            id: plugin_id.clone(),
+            path: path.to_path_buf(),
+            metadata,
+            config,
+            module,
+            stats: PluginStats::default(),
+        };
+
+        // Store plugin
+        self.plugins.insert(plugin_id.clone(), loaded);
+
+        // Update execution order
+        self.update_execution_order();
+
+        Ok(plugin_id)
+    }
+
+    /// Unload a plugin
+    pub fn unload(&mut self, plugin_id: &str) -> PluginResult<()> {
+        let _plugin = self.plugins.remove(plugin_id)
+            .ok_or_else(|| PluginError::NotFound(plugin_id.to_string()))?;
+
+        // Update execution order
+        self.update_execution_order();
+
+        Ok(())
+    }
+
+    /// Reload a plugin
+    pub fn reload(&mut self, plugin_id: &str) -> PluginResult<()> {
+        let plugin = self.plugins.get(plugin_id)
+            .ok_or_else(|| PluginError::NotFound(plugin_id.to_string()))?;
+
+        let path = plugin.path.clone();
+        let config = plugin.config.clone();
+
+        self.unload(plugin_id)?;
+        self.load(&path, config)?;
+
+        Ok(())
+    }
+
     /// Get plugin by ID
     pub fn get(&self, plugin_id: &str) -> Option<&LoadedPlugin> {
         self.plugins.get(plugin_id)
@@ -137,7 +185,69 @@ impl PluginManager {
         self.config.enabled
     }
 
-    /// Update execution order based on priority
+    /// Execute plugins on request (simplified)
+    pub fn on_request(&mut self, _request: &mut PluginRequest) -> PluginResult<PluginAction> {
+        if !self.config.enabled {
+            return Ok(PluginAction::Continue);
+        }
+
+        // TODO: Implement actual Wasm execution
+        // For now, just return Continue
+        
+        for plugin_id in self.execution_order.clone() {
+            let plugin = self.plugins.get_mut(&plugin_id)
+                .ok_or_else(|| PluginError::NotFound(plugin_id.clone()))?;
+
+            if !plugin.config.enabled {
+                continue;
+            }
+
+            plugin.stats.request_count += 1;
+            
+            // Execute plugin logic here
+            // For now, all plugins continue
+        }
+
+        Ok(PluginAction::Continue)
+    }
+
+    /// Execute plugins on response (simplified)
+    pub fn on_response(&mut self, _response: &mut PluginResponse) -> PluginResult<PluginAction> {
+        if !self.config.enabled {
+            return Ok(PluginAction::Continue);
+        }
+
+        // TODO: Implement actual Wasm execution
+        
+        for plugin_id in self.execution_order.clone() {
+            let plugin = self.plugins.get_mut(&plugin_id)
+                .ok_or_else(|| PluginError::NotFound(plugin_id.clone()))?;
+
+            if !plugin.config.enabled {
+                continue;
+            }
+
+            plugin.stats.response_count += 1;
+        }
+
+        Ok(PluginAction::Continue)
+    }
+
+    /// Update plugin configuration
+    pub fn update_config(&mut self, plugin_id: &str, new_config: PluginConfig) -> PluginResult<()> {
+        let plugin = self.plugins.get_mut(plugin_id)
+            .ok_or_else(|| PluginError::NotFound(plugin_id.to_string()))?;
+
+        plugin.config = new_config;
+
+        // Update execution order if priority changed
+        self.update_execution_order();
+
+        Ok(())
+    }
+
+    // Private helper methods
+
     fn update_execution_order(&mut self) {
         let mut plugins: Vec<_> = self.plugins
             .values()
@@ -174,5 +284,19 @@ mod tests {
         stats.total_latency_us = 500;
 
         assert_eq!(stats.avg_latency_us(), 50.0);
+    }
+
+    #[test]
+    fn test_manager_config() {
+        let config = PluginManagerConfig {
+            enabled: false,
+            max_plugins: 10,
+            default_timeout_ms: 50,
+            auto_reload: false,
+        };
+
+        let manager = PluginManager::with_config(config);
+        assert!(manager.is_ok());
+        assert!(!manager.unwrap().is_enabled());
     }
 }

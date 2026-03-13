@@ -7,6 +7,10 @@ pub mod traits;
 pub mod loader;
 pub mod manager;
 pub mod host;
+pub mod watcher;
+
+#[cfg(test)]
+mod tests;
 
 pub use error::{PluginError, PluginResult};
 pub use traits::{
