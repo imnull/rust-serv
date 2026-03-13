@@ -82,6 +82,12 @@ impl Default for PluginManagerConfig {
     }
 }
 
+impl Default for PluginManager {
+    fn default() -> Self {
+        Self::new().expect("Failed to create PluginManager")
+    }
+}
+
 impl PluginManager {
     /// Create new plugin manager
     pub fn new() -> PluginResult<Self> {
@@ -299,8 +305,10 @@ impl PluginManager {
         self.execution_order = plugins.into_iter().map(|(_, id)| id).collect();
     }
 }
+#[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_manager_creation() {
@@ -309,25 +317,215 @@ mod tests {
     }
 
     #[test]
-    fn test_plugin_stats() {
+    fn test_plugin_stats_default() {
+        let stats = PluginStats::default();
+        assert_eq!(stats.request_count, 0);
+        assert_eq!(stats.response_count, 0);
+        assert_eq!(stats.error_count, 0);
+        assert_eq!(stats.total_latency_us, 0);
+    }
+
+    #[test]
+    fn test_plugin_stats_avg_latency() {
         let mut stats = PluginStats::default();
         stats.request_count = 10;
         stats.total_latency_us = 500;
-
         assert_eq!(stats.avg_latency_us(), 50.0);
     }
 
     #[test]
-    fn test_manager_config() {
+    fn test_plugin_stats_avg_latency_zero() {
+        let stats = PluginStats::default();
+        assert_eq!(stats.avg_latency_us(), 0.0);
+    }
+
+    #[test]
+    fn test_manager_config_default() {
+        let config = PluginManagerConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.max_plugins, 100);
+        assert_eq!(config.default_timeout_ms, 100);
+        assert!(config.auto_reload);
+    }
+
+    #[test]
+    fn test_manager_with_disabled_config() {
         let config = PluginManagerConfig {
             enabled: false,
             max_plugins: 10,
             default_timeout_ms: 50,
             auto_reload: false,
         };
+        let manager = PluginManager::with_config(config).unwrap();
+        assert!(!manager.is_enabled());
+    }
 
-        let manager = PluginManager::with_config(config);
-        assert!(manager.is_ok());
-        assert!(!manager.unwrap().is_enabled());
+    #[test]
+    fn test_manager_default() {
+        let manager = PluginManager::default();
+        assert!(manager.is_enabled());
+    }
+
+    #[test]
+    fn test_manager_is_enabled() {
+        let manager = PluginManager::new().unwrap();
+        assert!(manager.is_enabled());
+    }
+
+    #[test]
+    fn test_manager_count_empty() {
+        let manager = PluginManager::new().unwrap();
+        assert_eq!(manager.count(), 0);
+    }
+
+    #[test]
+    fn test_manager_list_empty() {
+        let manager = PluginManager::new().unwrap();
+        assert!(manager.list().is_empty());
+    }
+
+    #[test]
+    fn test_manager_get_nonexistent() {
+        let manager = PluginManager::new().unwrap();
+        assert!(manager.get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_manager_load_when_disabled() {
+        let config = PluginManagerConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        let mut manager = PluginManager::with_config(config).unwrap();
+        let temp_path = PathBuf::from("/tmp/test_plugin.wasm");
+        let result = manager.load(&temp_path, PluginConfig::default());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_manager_load_exceeds_max() {
+        let config = PluginManagerConfig {
+            max_plugins: 0,
+            ..Default::default()
+        };
+        let mut manager = PluginManager::with_config(config).unwrap();
+        let temp_path = PathBuf::from("/tmp/test_plugin.wasm");
+        let result = manager.load(&temp_path, PluginConfig::default());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_manager_unload_nonexistent() {
+        let mut manager = PluginManager::new().unwrap();
+        let result = manager.unload("nonexistent");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_manager_reload_nonexistent() {
+        let mut manager = PluginManager::new().unwrap();
+        let result = manager.reload("nonexistent");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_manager_update_config_nonexistent() {
+        let mut manager = PluginManager::new().unwrap();
+        let new_config = PluginConfig::default();
+        let result = manager.update_config("nonexistent", new_config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_manager_on_request_when_disabled() {
+        let config = PluginManagerConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        let mut manager = PluginManager::with_config(config).unwrap();
+        let mut request = PluginRequest {
+            method: "GET".to_string(),
+            path: "/".to_string(),
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            body: None,
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "test".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+        let action = manager.on_request(&mut request).unwrap();
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[test]
+    fn test_manager_on_response_when_disabled() {
+        let config = PluginManagerConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        let mut manager = PluginManager::with_config(config).unwrap();
+        let mut response = PluginResponse::ok();
+        let action = manager.on_response(&mut response).unwrap();
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[test]
+    fn test_manager_on_request_empty() {
+        let mut manager = PluginManager::new().unwrap();
+        let mut request = PluginRequest {
+            method: "GET".to_string(),
+            path: "/".to_string(),
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            body: None,
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "test".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+        let action = manager.on_request(&mut request).unwrap();
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[test]
+    fn test_manager_on_response_empty() {
+        let mut manager = PluginManager::new().unwrap();
+        let mut response = PluginResponse::ok();
+        let action = manager.on_response(&mut response).unwrap();
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[test]
+    fn test_manager_with_complex_request() {
+        let mut manager = PluginManager::new().unwrap();
+        let mut request = PluginRequest {
+            method: "POST".to_string(),
+            path: "/api/test".to_string(),
+            query: [("param1".to_string(), "value1".to_string())].into_iter().collect(),
+            headers: [("content-type".to_string(), "application/json".to_string())].into_iter().collect(),
+            body: Some("test body".to_string()),
+            client_ip: "192.168.1.1".to_string(),
+            request_id: "req-123".to_string(),
+            version: "HTTP/2.0".to_string(),
+            host: "example.com".to_string(),
+        };
+        let action = manager.on_request(&mut request).unwrap();
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[test]
+    fn test_manager_config_clone() {
+        let config = PluginManagerConfig::default();
+        let cloned = config.clone();
+        assert_eq!(config.enabled, cloned.enabled);
+        assert_eq!(config.max_plugins, cloned.max_plugins);
+    }
+
+    #[test]
+    fn test_manager_config_debug() {
+        let config = PluginManagerConfig::default();
+        let debug_str = format!("{:?}", config);
+        assert!(debug_str.contains("PluginManagerConfig"));
     }
 }
