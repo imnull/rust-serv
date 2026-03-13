@@ -8,6 +8,7 @@ pub mod loader;
 pub mod manager;
 pub mod host;
 pub mod watcher;
+pub mod executor;
 
 #[cfg(test)]
 mod tests;

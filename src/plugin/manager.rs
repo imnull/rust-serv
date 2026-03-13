@@ -2,6 +2,7 @@
 
 use crate::plugin::{
     error::{PluginError, PluginResult},
+    executor::WasmExecutor,
     loader::PluginLoader,
     traits::{PluginConfig, PluginMetadata, PluginRequest, PluginResponse, PluginAction},
 };
@@ -55,6 +56,7 @@ impl PluginStats {
 /// Plugin manager
 pub struct PluginManager {
     plugins: HashMap<String, LoadedPlugin>,
+    executors: HashMap<String, WasmExecutor>,
     loader: PluginLoader,
     execution_order: Vec<String>,
     config: PluginManagerConfig,
@@ -90,6 +92,7 @@ impl PluginManager {
     pub fn with_config(config: PluginManagerConfig) -> PluginResult<Self> {
         Ok(Self {
             plugins: HashMap::new(),
+            executors: HashMap::new(),
             loader: PluginLoader::new()?,
             execution_order: vec![],
             config,
@@ -118,6 +121,9 @@ impl PluginManager {
             return Err(PluginError::AlreadyLoaded(plugin_id));
         }
 
+        // Create executor
+        let executor = WasmExecutor::new(self.loader.engine(), module.clone(), &config)?;
+
         // Create loaded plugin
         let loaded = LoadedPlugin {
             id: plugin_id.clone(),
@@ -128,8 +134,9 @@ impl PluginManager {
             stats: PluginStats::default(),
         };
 
-        // Store plugin
+        // Store plugin and executor
         self.plugins.insert(plugin_id.clone(), loaded);
+        self.executors.insert(plugin_id.clone(), executor);
 
         // Update execution order
         self.update_execution_order();
@@ -139,6 +146,12 @@ impl PluginManager {
 
     /// Unload a plugin
     pub fn unload(&mut self, plugin_id: &str) -> PluginResult<()> {
+        // Unload executor
+        if let Some(mut executor) = self.executors.remove(plugin_id) {
+            let _ = executor.unload();
+        }
+
+        // Remove plugin
         let _plugin = self.plugins.remove(plugin_id)
             .ok_or_else(|| PluginError::NotFound(plugin_id.to_string()))?;
 
@@ -185,15 +198,13 @@ impl PluginManager {
         self.config.enabled
     }
 
-    /// Execute plugins on request (simplified)
-    pub fn on_request(&mut self, _request: &mut PluginRequest) -> PluginResult<PluginAction> {
+    /// Execute plugins on request
+    pub fn on_request(&mut self, request: &mut PluginRequest) -> PluginResult<PluginAction> {
         if !self.config.enabled {
             return Ok(PluginAction::Continue);
         }
 
-        // TODO: Implement actual Wasm execution
-        // For now, just return Continue
-        
+        // Execute plugins in order
         for plugin_id in self.execution_order.clone() {
             let plugin = self.plugins.get_mut(&plugin_id)
                 .ok_or_else(|| PluginError::NotFound(plugin_id.clone()))?;
@@ -202,24 +213,36 @@ impl PluginManager {
                 continue;
             }
 
+            // Get executor
+            let executor = self.executors.get_mut(&plugin_id)
+                .ok_or_else(|| PluginError::NotFound(plugin_id.clone()))?;
+
+            let start = std::time::Instant::now();
+
+            // Execute plugin
+            let action = executor.on_request(request)?;
+
             plugin.stats.request_count += 1;
-            
-            // Execute plugin logic here
-            // For now, all plugins continue
+            plugin.stats.total_latency_us += start.elapsed().as_micros() as u64;
+
+            // Handle action
+            match action {
+                PluginAction::Continue => continue,
+                other => return Ok(other),
+            }
         }
 
         Ok(PluginAction::Continue)
     }
 
-    /// Execute plugins on response (simplified)
-    pub fn on_response(&mut self, _response: &mut PluginResponse) -> PluginResult<PluginAction> {
+    /// Execute plugins on response
+    pub fn on_response(&mut self, response: &mut PluginResponse) -> PluginResult<PluginAction> {
         if !self.config.enabled {
             return Ok(PluginAction::Continue);
         }
 
-        // TODO: Implement actual Wasm execution
-        
-        for plugin_id in self.execution_order.clone() {
+        // Execute plugins in reverse order
+        for plugin_id in self.execution_order.iter().rev().cloned() {
             let plugin = self.plugins.get_mut(&plugin_id)
                 .ok_or_else(|| PluginError::NotFound(plugin_id.clone()))?;
 
@@ -227,7 +250,23 @@ impl PluginManager {
                 continue;
             }
 
+            // Get executor
+            let executor = self.executors.get_mut(&plugin_id)
+                .ok_or_else(|| PluginError::NotFound(plugin_id.clone()))?;
+
+            let start = std::time::Instant::now();
+
+            // Execute plugin
+            let action = executor.on_response(response)?;
+
             plugin.stats.response_count += 1;
+            plugin.stats.total_latency_us += start.elapsed().as_micros() as u64;
+
+            // Handle action
+            match action {
+                PluginAction::Continue => continue,
+                other => return Ok(other),
+            }
         }
 
         Ok(PluginAction::Continue)
