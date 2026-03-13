@@ -1,29 +1,19 @@
-# Build stage
-FROM rust:1.82 AS builder
-
-# Install ALL build dependencies that might be needed
-RUN apt-get update && \
-    apt-get install -y \
-    build-essential \
-    pkg-config \
-    libssl-dev \
-    clang \
-    cmake \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# Build stage - use full Debian image with all build tools
+FROM rust:1.82
 
 WORKDIR /app
 
+# Copy all source files
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
+# Build release binary
 RUN cargo build --release
 
-# Runtime stage  
+# Runtime stage
 FROM debian:bookworm-slim
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
     libssl3 \
@@ -31,7 +21,7 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY --from=builder /app/target/release/rust-serv /usr/local/bin/rust-serv
+COPY --from=0 /app/target/release/rust-serv /usr/local/bin/rust-serv
 
 RUN mkdir -p /var/www/html /etc/rust-serv
 COPY docker/config.toml /etc/rust-serv/config.toml
