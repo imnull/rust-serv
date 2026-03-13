@@ -1,7 +1,5 @@
 # Build stage
-FROM rust:1.75-alpine AS builder
-
-RUN apk add --no-cache musl-dev
+FROM rust:1.82-bookworm AS builder
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
@@ -10,13 +8,16 @@ COPY src ./src
 RUN cargo build --release
 
 # Runtime stage
-FROM alpine:3.19
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY --from=builder /app/target/release/rust_serv /usr/local/bin/rust-serv
+COPY --from=builder /app/target/release/rust-serv /usr/local/bin/rust-serv
 
 # Create directories and copy default config
 RUN mkdir -p /var/www/html /etc/rust-serv
