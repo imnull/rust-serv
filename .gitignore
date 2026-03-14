@@ -2,3 +2,9 @@
 plugins/examples/*/target/
 plugins/examples/*/Cargo.lock
 *.wasm
+
+# Build artifacts
+/target/
+**/*.pdb
+**/*.exp
+**/*.lib

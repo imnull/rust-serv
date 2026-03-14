@@ -1,2 +1,0 @@
-cargo:rerun-if-changed=build.rs
-cargo:rustc-env=DEBUG_OUTPUT_DIR=/Users/kema/git/rust-serv/target/debug/build/wasmtime-component-macro-a95ae087ffcc8e71/out
