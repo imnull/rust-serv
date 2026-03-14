@@ -437,6 +437,7 @@ mod tests {
             max_body_size: 10 * 1024 * 1024,
             max_headers: 100,
             management: None,
+            plugins: None,
             auto_tls: None,
         });
         let handler = Handler::new(config);

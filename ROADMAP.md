@@ -1,9 +1,9 @@
 # Rust Serv 开发路线图
 
 > 当前版本: 0.3.0  
-> 测试覆盖率: 95.69% ✅  
-> 测试用例: 824 ✅  
-> 最后更新: 2026-03-12
+> 测试覆盖率: ~95% ✅  
+> 测试用例: 1000+ ✅  
+> 最后更新: 2026-03-14
 
 ---
 
@@ -21,6 +21,39 @@
 - [x] CORS 跨域支持
 - [x] 安全中间件 (速率限制、IP控制)
 - [x] 日志系统
+
+### 插件系统 (2026-03-14) ✅
+- [x] **Plugin SDK** - 完整的插件开发工具包
+  - 核心类型定义 (traits, error, host)
+  - `export_plugin!` 宏
+  - 5 个内置插件 (AddHeader, RateLimiter, CORS, RequestLog, IpWhitelist)
+  - 9 个示例插件
+  - 159 个单元测试
+- [x] **Plugin Core** - 运行时引擎
+  - Wasm 执行器 (executor.rs)
+  - 插件加载器 (loader.rs)
+  - 插件管理器 (manager.rs)
+  - 文件监视器 (watcher.rs)
+  - Host 函数接口
+  - 363 个单元测试
+- [x] **PluginMiddleware** - Tower 中间件集成
+  - HTTP 请求/响应转换
+  - 插件链执行
+  - 动作处理 (Continue/Intercept/Modify)
+- [x] **管理 API** - RESTful 接口
+  - `GET /_plugins` - 列表
+  - `GET /_plugins/{id}` - 详情
+  - `POST /_plugins/load` - 加载
+  - `POST /_plugins/{id}/reload` - 重载
+  - `DELETE /_plugins/{id}` - 卸载
+  - `PUT /_plugins/{id}` - 更新配置
+- [x] **配置集成**
+  - `PluginSystemConfig` - 系统配置
+  - `PluginLoadConfig` - 加载配置
+  - TOML 配置支持
+- [x] **热重载** - 文件系统监听
+  - 自动检测插件变更
+  - 运行时重载
 
 ### 性能优化 (2026-03-11)
 - [x] **内存缓存系统 (Memory Cache)**

@@ -58,6 +58,14 @@
 - ✅ **自定义错误页面** - 美观模板，支持 400-504 错误码
 - ✅ **配置热重载** - 零停机配置更新
 
+### 插件系统 (v0.3.0+)
+- ✅ **WebAssembly 插件** - 热插拔扩展机制
+- ✅ **Plugin SDK** - 完整的 Rust SDK
+- ✅ **内置插件** - 5 个常用插件 (限流、CORS、认证等)
+- ✅ **管理 API** - `/_plugins` 接口管理插件
+- ✅ **热重载** - 运行时加载/卸载/更新插件
+- ✅ **示例插件** - 9 个完整示例
+
 ## ⚡ 性能
 
 rust-serv 在静态文件服务上显著快于 nginx：
@@ -187,9 +195,83 @@ path = "/admin"
 users = [
     { username = "admin", password_hash = "hashed_password" }
 ]
+
+# 插件系统
+[plugins]
+enabled = true
+directory = "./plugins"      # 插件目录
+hot_reload = true            # 热重载
+max_plugins = 100            # 最大插件数
+timeout_ms = 100             # 执行超时
+
+# 预加载插件
+[[plugins.preload]]
+id = "rate-limiter"
+path = "rate_limiter.wasm"
+enabled = true
+priority = 200
+
+[plugins.preload.config]
+requests_per_minute = 100
+burst_size = 20
+
+[[plugins.preload]]
+id = "cors"
+path = "cors.wasm"
+enabled = true
+priority = 150
+
+[plugins.preload.config]
+allowed_origins = ["https://example.com"]
+allowed_methods = ["GET", "POST", "PUT", "DELETE"]
 ```
 
 ## 模块文档
+
+### 插件系统 (plugin)
+
+```rust
+use rust_serv::plugin::{PluginManager, PluginConfig};
+
+// 创建插件管理器
+let mut manager = PluginManager::new()?;
+
+// 加载插件
+let config = PluginConfig::default();
+manager.load("./plugins/rate_limiter.wasm", config)?;
+
+// 处理请求
+let mut request = PluginRequest::new("GET", "/api/users");
+let action = manager.on_request(&mut request)?;
+
+// 插件管理 API
+// GET  /_plugins           - 列出插件
+// POST /_plugins/load      - 加载插件
+// POST /_plugins/{id}/reload - 重载插件
+// DELETE /_plugins/{id}    - 卸载插件
+```
+
+**开发插件**:
+```rust
+use rust_serv_plugin::{Plugin, PluginMetadata, PluginAction, export_plugin};
+
+pub struct MyPlugin;
+
+impl Plugin for MyPlugin {
+    fn metadata(&self) -> &PluginMetadata {
+        &METADATA
+    }
+    
+    fn on_request(&mut self, req: &mut PluginRequest) -> Result<PluginAction, PluginError> {
+        // 自定义逻辑
+        Ok(PluginAction::Continue)
+    }
+}
+
+export_plugin!(MyPlugin);
+```
+
+详细文档: [插件系统](./docs/plugin-system/README.md)
 
 ### 内存缓存 (memory_cache)
 

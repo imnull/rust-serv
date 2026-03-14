@@ -59,6 +59,7 @@ thiserror = "2.0"
 
 # Async utilities
 futures = "0.3"
+nix = { version = "0.29", features = ["user"] }
 
 # Time formatting
 time = { version = "0.3", features = ["formatting", "local-offset"] }
@@ -72,6 +73,7 @@ sha1 = "0.10"
 # Plugin system (Wasm)
 wasmtime = "27"
 wasmtime-wasi = "27"
+crc32fast = "1.4"
 
 [dev-dependencies]
 # Testing
@@ -80,6 +82,7 @@ tempfile = "3.14"
 proptest = "1.5"
 criterion = "0.5"
 rcgen = "0.13"
+wat = "1.0"
 
 [profile.release]
 opt-level = 3

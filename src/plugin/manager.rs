@@ -119,8 +119,26 @@ impl PluginManager {
         let module = self.loader.compile(path)?;
 
         // Extract metadata
-        let metadata = self.loader.extract_metadata(&module)?;
-        let plugin_id = metadata.id.clone();
+        let mut metadata = self.loader.extract_metadata(&module)?;
+        
+        // Generate unique plugin ID based on file path if metadata ID is "unknown"
+        let plugin_id = if metadata.id == "unknown" {
+            // Use file stem + hash of full path to create unique ID
+            let file_stem = path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("plugin");
+            let path_hash = format!("{:x}", crc32fast::hash(path.to_string_lossy().as_bytes()));
+            // Ensure we don't panic if hash is short
+            let hash_prefix = if path_hash.len() >= 8 {
+                &path_hash[..8]
+            } else {
+                &path_hash
+            };
+            format!("{}-{}", file_stem, hash_prefix)
+        } else {
+            metadata.id.clone()
+        };
+        metadata.id = plugin_id.clone();
 
         // Check if already loaded
         if self.plugins.contains_key(&plugin_id) {

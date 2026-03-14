@@ -1,14 +1,22 @@
 //! Management API module
 //!
 //! This module provides management API endpoints for health checks,
-//! readiness checks, and runtime statistics.
+//! readiness checks, runtime statistics, and plugin management.
 
 mod config;
 mod handler;
+mod plugins;
 mod stats;
 
 pub use config::ManagementConfig;
 pub use handler::{ManagementHandler, ManagementResponse};
+pub use plugins::{
+    PluginManagementHandler,
+    PluginListResponse,
+    PluginInfo,
+    LoadPluginRequest,
+    UpdatePluginRequest,
+};
 pub use stats::{ServerStats, StatsCollector};
 
 use http_body_util::Full;

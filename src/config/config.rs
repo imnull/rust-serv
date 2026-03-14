@@ -108,9 +108,67 @@ pub struct Config {
     #[serde(default)]
     pub management: Option<ManagementConfig>,
 
+    /// Plugin system configuration
+    #[serde(default)]
+    pub plugins: Option<PluginSystemConfig>,
+
     /// Auto TLS (Let's Encrypt) configuration
     #[serde(default)]
     pub auto_tls: Option<AutoTlsConfig>,
+}
+
+/// Plugin system configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PluginSystemConfig {
+    /// Enable plugin system (default: false)
+    #[serde(default = "default_plugins_enabled")]
+    pub enabled: bool,
+
+    /// Plugin directory path (default: "./plugins")
+    #[serde(default = "default_plugins_dir")]
+    pub directory: PathBuf,
+
+    /// Enable hot reload (default: true)
+    #[serde(default = "default_plugins_hot_reload")]
+    pub hot_reload: bool,
+
+    /// Maximum number of plugins (default: 100)
+    #[serde(default = "default_plugins_max")]
+    pub max_plugins: usize,
+
+    /// Default plugin timeout in milliseconds (default: 100)
+    #[serde(default = "default_plugins_timeout")]
+    pub timeout_ms: u64,
+
+    /// Management API prefix for plugins (default: "_plugins")
+    #[serde(default = "default_plugins_api_prefix")]
+    pub api_prefix: String,
+
+    /// Preload plugins on startup (default: [])
+    #[serde(default)]
+    pub preload: Vec<PluginLoadConfig>,
+}
+
+/// Plugin load configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PluginLoadConfig {
+    /// Plugin ID
+    pub id: String,
+
+    /// Plugin file path (relative to plugins directory)
+    pub path: String,
+
+    /// Plugin priority (higher = earlier execution)
+    #[serde(default)]
+    pub priority: Option<i32>,
+
+    /// Whether plugin is enabled
+    #[serde(default = "default_plugin_enabled")]
+    pub enabled: bool,
+
+    /// Plugin-specific configuration
+    #[serde(default)]
+    pub config: std::collections::HashMap<String, serde_json::Value>,
 }
 
 /// Management API configuration
@@ -198,6 +256,7 @@ impl Default for Config {
             max_body_size: 10 * 1024 * 1024, // 10 MB
             max_headers: 100,
             management: None,
+            plugins: None,
             auto_tls: None,
         }
     }
@@ -301,6 +360,35 @@ fn default_max_body_size() -> usize {
 
 fn default_max_headers() -> usize {
     100
+}
+
+// Plugin config defaults
+fn default_plugins_enabled() -> bool {
+    false
+}
+
+fn default_plugins_dir() -> PathBuf {
+    PathBuf::from("./plugins")
+}
+
+fn default_plugins_hot_reload() -> bool {
+    true
+}
+
+fn default_plugins_max() -> usize {
+    100
+}
+
+fn default_plugins_timeout() -> u64 {
+    100
+}
+
+fn default_plugins_api_prefix() -> String {
+    "_plugins".to_string()
+}
+
+fn default_plugin_enabled() -> bool {
+    true
 }
 
 // Management config defaults

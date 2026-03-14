@@ -137,9 +137,29 @@ mod tests {
 
     #[test]
     fn test_read_file_permission_error() {
-        let result = FileService::read_file(Path::new("/root/.bashrc"));
-        // On non-root systems, this should fail
-        assert!(result.is_err());
+        use std::os::unix::fs::PermissionsExt;
+        
+        // Skip this test if running as root (root bypasses file permissions)
+        let is_root = unsafe { nix::unistd::getuid() == nix::unistd::Uid::from_raw(0) };
+        if is_root {
+            return; // Root can read anything, skip this test
+        }
+        
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("no_read.txt");
+        fs::write(&file_path, "secret").unwrap();
+        
+        // Remove read permission
+        let mut permissions = fs::metadata(&file_path).unwrap().permissions();
+        permissions.set_mode(0o000);
+        fs::set_permissions(&file_path, permissions).unwrap();
+        
+        let result = FileService::read_file(&file_path);
+        
+        // Restore permissions for cleanup
+        let _ = fs::set_permissions(&file_path, fs::Permissions::from_mode(0o644));
+        
+        assert!(result.is_err(), "Expected permission error for file with no read access");
     }
 
     #[test]

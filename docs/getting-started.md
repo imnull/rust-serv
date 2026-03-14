@@ -278,6 +278,23 @@ curl http://localhost:8080/metrics
 
 > **rust-serv 就像一把瑞士军刀：简单、可靠、功能齐全。**
 
+### 示例 4：使用插件扩展功能
+
+```bash
+# 1. 启用插件系统
+# config.toml
+[plugins]
+enabled = true
+directory = "./plugins"
+hot_reload = true
+
+# 2. 下载或开发插件
+# 示例：限流插件
+# 3. 自动热重载，无需重启服务
+```
+
+更多插件开发：[插件系统指南](../plugin-system/README.md)
+
 一行命令，开始你的 Web 之旅：
 
 ```bash

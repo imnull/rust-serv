@@ -97,7 +97,7 @@ impl PluginLoader {
     }
     
     /// Extract metadata from Wasm module
-    pub fn extract_metadata(&self, module: &Module) -> PluginResult<PluginMetadata> {
+    pub fn extract_metadata(&self, _module: &Module) -> PluginResult<PluginMetadata> {
         // Return default metadata
         // TODO: Implement metadata extraction from custom sections
         Ok(PluginMetadata {

@@ -30,5 +30,11 @@ pub enum Error {
     AddrParse(#[from] AddrParseError),
 }
 
+impl From<crate::plugin::error::PluginError> for Error {
+    fn from(err: crate::plugin::error::PluginError) -> Self {
+        Error::Internal(format!("Plugin error: {}", err))
+    }
+}
+
 /// Result type alias
 pub type Result<T> = std::result::Result<T, Error>;

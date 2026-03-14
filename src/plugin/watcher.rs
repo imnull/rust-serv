@@ -22,7 +22,7 @@ impl PluginWatcher {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         // Create file watcher
-        let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+        let watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
             if let Ok(event) = res {
                 let _ = tx.send(event);
             }

@@ -13,6 +13,7 @@
 - [内存缓存](#内存缓存)
 - [Prometheus 指标](#prometheus-指标)
 - [管理 API](#管理-api)
+- [插件系统](#插件系统)
 - [访问日志](#访问日志)
 - [带宽限速](#带宽限速)
 - [虚拟主机](#虚拟主机)
@@ -344,6 +345,144 @@ stats_path = "/stats"
   "bytes_received": 51200
 }
 ```
+
+---
+
+## 插件系统
+
+### `[plugins]`
+
+插件系统配置块。
+
+```toml
+[plugins]
+enabled = true
+directory = "./plugins"
+hot_reload = true
+max_plugins = 100
+timeout_ms = 100
+api_prefix = "_plugins"
+```
+
+---
+
+#### `plugins.enabled`
+
+**类型**: `bool`  
+**默认值**: `false`  
+**说明**: 是否启用插件系统
+
+---
+
+#### `plugins.directory`
+
+**类型**: `String`  
+**默认值**: `"./plugins"`  
+**说明**: 插件文件存放目录
+
+---
+
+#### `plugins.hot_reload`
+
+**类型**: `bool`  
+**默认值**: `true`  
+**说明**: 是否启用热重载（自动检测插件变更）
+
+---
+
+#### `plugins.max_plugins`
+
+**类型**: `usize`  
+**默认值**: `100`  
+**说明**: 最大同时加载插件数
+
+---
+
+#### `plugins.timeout_ms`
+
+**类型**: `u64`  
+**默认值**: `100`  
+**说明**: 插件执行默认超时（毫秒）
+
+---
+
+#### `plugins.api_prefix`
+
+**类型**: `String`  
+**默认值**: `"_plugins"`  
+**说明**: 插件管理 API 路径前缀
+
+管理端点：
+- `GET /_plugins` - 列出所有插件
+- `GET /_plugins/{id}` - 获取插件详情
+- `POST /_plugins/load` - 加载新插件
+- `POST /_plugins/{id}/reload` - 重载插件
+- `DELETE /_plugins/{id}` - 卸载插件
+- `PUT /_plugins/{id}` - 更新插件配置
+
+---
+
+### `[[plugins.preload]]`
+
+预加载插件配置（数组）。
+
+```toml
+[[plugins.preload]]
+id = "rate-limiter"
+path = "rate_limiter.wasm"
+enabled = true
+priority = 200
+
+[plugins.preload.config]
+requests_per_minute = 100
+burst_size = 20
+
+[[plugins.preload]]
+id = "cors"
+path = "cors.wasm"
+enabled = true
+priority = 150
+
+[plugins.preload.config]
+allowed_origins = ["https://example.com"]
+```
+
+---
+
+#### `plugins.preload.id`
+
+**类型**: `String`  
+**说明**: 插件唯一标识符
+
+---
+
+#### `plugins.preload.path`
+
+**类型**: `String`  
+**说明**: 插件文件路径（相对于 plugins.directory）
+
+---
+
+#### `plugins.preload.enabled`
+
+**类型**: `bool`  
+**默认值**: `true`  
+**说明**: 是否启用此插件
+
+---
+
+#### `plugins.preload.priority`
+
+**类型**: `i32`  
+**默认值**: `100`  
+**说明**: 插件执行优先级（数字越大越先执行）
+
+---
+
+#### `plugins.preload.config`
+
+**类型**: `Table`  
+**说明**: 插件特定配置（键值对）
 
 ---
 
