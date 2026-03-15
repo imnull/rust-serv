@@ -57,4 +57,52 @@ mod tests {
         let response = json_response(503, r#"{"status":"not_ready"}"#);
         assert_eq!(response.status(), 503);
     }
+
+    #[test]
+    fn test_json_response_404() {
+        let response = json_response(404, r#"{"error":"not_found"}"#);
+        assert_eq!(response.status(), 404);
+        assert_eq!(
+            response.headers().get("Content-Type").unwrap(),
+            "application/json"
+        );
+    }
+
+    #[test]
+    fn test_json_response_400() {
+        let response = json_response(400, r#"{"error":"bad_request"}"#);
+        assert_eq!(response.status(), 400);
+    }
+
+    #[test]
+    fn test_json_response_401() {
+        let response = json_response(401, r#"{"error":"unauthorized"}"#);
+        assert_eq!(response.status(), 401);
+    }
+
+    #[test]
+    fn test_json_response_403() {
+        let response = json_response(403, r#"{"error":"forbidden"}"#);
+        assert_eq!(response.status(), 403);
+    }
+
+    #[test]
+    fn test_json_response_empty_body() {
+        let response = json_response(200, "");
+        assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_json_response_unicode_body() {
+        let response = json_response(200, r#"{"message":"你好世界"}"#);
+        assert_eq!(response.status(), 200);
+    }
+
+    #[test]
+    fn test_json_response_large_body() {
+        let large_body = "x".repeat(10000);
+        let json_body = format!("{{\"data\":\"{}\"}}", large_body);
+        let response = json_response(200, &json_body);
+        assert_eq!(response.status(), 200);
+    }
 }
