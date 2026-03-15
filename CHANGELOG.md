@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.3.0] - 2026-03-15
+
+### Added
+- **WebAssembly Plugin System** - 完整的热插拔插件系统
+  - Plugin SDK - 4 核心模块 (types, error, host, lib)
+  - Plugin Runtime - executor, loader, manager, watcher
+  - PluginMiddleware - Tower 中间件集成
+  - 管理 API - `/_plugins/*` RESTful 接口
+  - 9 个示例插件 (CORS, 限流, JWT 认证等)
+  - 23 个集成测试
+- 1050+ 单元测试
+- 93%+ 测试覆盖率
+- 完整插件开发文档
+
+### Changed
+- 更新 ROADMAP.md 包含插件系统规划
+- 新增 RELEASE_ASSESSMENT.md 上线评估报告
+- 优化测试覆盖率和代码质量
+
 ## [0.3.0] - 2026-03-12
 
 ### Added
