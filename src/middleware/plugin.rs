@@ -175,6 +175,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use http_body_util::Empty;
+    use hyper::body::Bytes;
 
     #[test]
     fn test_plugin_middleware_config_default() {
@@ -186,9 +188,150 @@ mod tests {
     }
 
     #[test]
+    fn test_plugin_middleware_config_custom() {
+        let config = PluginMiddlewareConfig {
+            enabled: false,
+            plugin_dir: std::path::PathBuf::from("/tmp/plugins"),
+            hot_reload: false,
+            max_body_size: 2048,
+            timeout_ms: 200,
+        };
+        assert!(!config.enabled);
+        assert!(!config.hot_reload);
+        assert_eq!(config.max_body_size, 2048);
+        assert_eq!(config.timeout_ms, 200);
+        assert_eq!(config.plugin_dir, std::path::PathBuf::from("/tmp/plugins"));
+    }
+
+    #[test]
     fn test_plugin_layer_creation() {
         let manager = Arc::new(RwLock::new(PluginManager::new().unwrap()));
         let layer = PluginLayer::new(manager);
         assert!(layer.config().enabled);
+        assert_eq!(layer.config().plugin_dir, std::path::PathBuf::from("./plugins"));
+    }
+
+    #[test]
+    fn test_plugin_layer_with_config() {
+        let manager = Arc::new(RwLock::new(PluginManager::new().unwrap()));
+        let config = PluginMiddlewareConfig {
+            enabled: false,
+            plugin_dir: std::path::PathBuf::from("/custom/plugins"),
+            hot_reload: false,
+            max_body_size: 512,
+            timeout_ms: 50,
+        };
+        let layer = PluginLayer::with_config(manager, config.clone());
+        assert!(!layer.config().enabled);
+        assert_eq!(layer.config().plugin_dir, config.plugin_dir);
+    }
+
+    #[test]
+    fn test_plugin_middleware_creation() {
+        let manager = Arc::new(RwLock::new(PluginManager::new().unwrap()));
+        let inner_service = tower::service_fn(|_req: Request<Empty<Bytes>>| async {
+            Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+        });
+        let middleware = PluginMiddleware::new(inner_service, manager);
+        assert!(middleware.config.enabled);
+    }
+
+    #[test]
+    fn test_plugin_middleware_with_config() {
+        let manager = Arc::new(RwLock::new(PluginManager::new().unwrap()));
+        let inner_service = tower::service_fn(|_req: Request<Empty<Bytes>>| async {
+            Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+        });
+        let config = PluginMiddlewareConfig {
+            enabled: false,
+            plugin_dir: std::path::PathBuf::from("/test/plugins"),
+            hot_reload: false,
+            max_body_size: 1024,
+            timeout_ms: 150,
+        };
+        let middleware = PluginMiddleware::with_config(inner_service, manager, config);
+        assert!(!middleware.config.enabled);
+    }
+
+    #[test]
+    fn test_plugin_middleware_manager() {
+        let manager = Arc::new(RwLock::new(PluginManager::new().unwrap()));
+        let inner_service = tower::service_fn(|_req: Request<Empty<Bytes>>| async {
+            Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+        });
+        let middleware = PluginMiddleware::new(inner_service, Arc::clone(&manager));
+        let retrieved_manager = middleware.manager();
+        assert!(Arc::ptr_eq(&manager, &retrieved_manager));
+    }
+
+    #[tokio::test]
+    async fn test_plugin_layer_service() {
+        let manager = Arc::new(RwLock::new(PluginManager::new().unwrap()));
+        let layer = PluginLayer::new(manager);
+        
+        let inner_service = tower::service_fn(|_req: Request<Empty<Bytes>>| async {
+            Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+        });
+        
+        let _middleware = layer.layer(inner_service);
+    }
+
+    #[tokio::test]
+    async fn test_plugin_middleware_disabled() {
+        let manager = Arc::new(RwLock::new(PluginManager::new().unwrap()));
+        let inner_service = tower::service_fn(|_req: Request<Empty<Bytes>>| async {
+            Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+        });
+        
+        let config = PluginMiddlewareConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        
+        let mut middleware = PluginMiddleware::with_config(inner_service, manager, config);
+        let request = Request::builder()
+            .uri("/test")
+            .body(Empty::new())
+            .unwrap();
+        
+        let response = middleware.call(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_plugin_middleware_manager_disabled() {
+        use crate::plugin::manager::PluginManagerConfig;
+        
+        let config = PluginManagerConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        let manager = Arc::new(RwLock::new(PluginManager::with_config(config).unwrap()));
+        
+        let inner_service = tower::service_fn(|_req: Request<Empty<Bytes>>| async {
+            Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+        });
+        
+        let mut middleware = PluginMiddleware::new(inner_service, manager);
+        let request = Request::builder()
+            .uri("/test")
+            .body(Empty::new())
+            .unwrap();
+        
+        let response = middleware.call(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_plugin_middleware_poll_ready() {
+        let manager = Arc::new(RwLock::new(PluginManager::new().unwrap()));
+        let inner_service = tower::service_fn(|_req: Request<Empty<Bytes>>| async {
+            Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+        });
+        
+        let mut middleware = PluginMiddleware::new(inner_service, manager);
+        let future = std::future::poll_fn(|cx| middleware.poll_ready(cx));
+        let result = future.await;
+        assert!(result.is_ok());
     }
 }

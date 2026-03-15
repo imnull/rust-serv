@@ -298,10 +298,219 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_metric_calls() {
-        for i in 0..10 {
-            HostFunctions::host_metrics_counter(&format!("counter_{}", i), i as f64);
-            HostFunctions::host_metrics_gauge(&format!("gauge_{}", i), i as f64 * 0.5);
+    fn test_host_metrics_histogram() {
+        HostFunctions::host_metrics_histogram("test_histogram", 100.0);
+    }
+
+    #[test]
+    fn test_host_metrics_histogram_zero() {
+        HostFunctions::host_metrics_histogram("zero_histogram", 0.0);
+    }
+
+    #[test]
+    fn test_host_metrics_histogram_negative() {
+        HostFunctions::host_metrics_histogram("negative_histogram", -50.0);
+    }
+
+    #[test]
+    fn test_host_set_header_unicode() {
+        HostFunctions::host_set_header("X-Custom-Header", "你好世界 🌍");
+    }
+
+    #[test]
+    fn test_host_set_header_long_value() {
+        HostFunctions::host_set_header("X-Long-Header", &"a".repeat(1000));
+    }
+
+    #[test]
+    fn test_host_log_long_message() {
+        HostFunctions::host_log(1, &"a".repeat(10000));
+    }
+
+    #[test]
+    fn test_host_log_special_chars() {
+        HostFunctions::host_log(1, "Special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?");
+    }
+
+    #[test]
+    fn test_host_get_config_special_chars() {
+        let result = HostFunctions::host_get_config("key.with.special!chars@123");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_host_metrics_counter_large_value() {
+        HostFunctions::host_metrics_counter("large_counter", 1_000_000.0);
+    }
+
+    #[test]
+    fn test_host_metrics_gauge_large_value() {
+        HostFunctions::host_metrics_gauge("large_gauge", 1_000_000.0);
+    }
+
+    #[test]
+    fn test_host_metrics_histogram_large_value() {
+        HostFunctions::host_metrics_histogram("large_histogram", 1_000_000.0);
+    }
+
+    #[test]
+    fn test_host_metrics_counter_small_value() {
+        HostFunctions::host_metrics_counter("small_counter", 0.0001);
+    }
+
+    #[test]
+    fn test_host_metrics_gauge_small_value() {
+        HostFunctions::host_metrics_gauge("small_gauge", 0.0001);
+    }
+
+    #[test]
+    fn test_host_metrics_histogram_small_value() {
+        HostFunctions::host_metrics_histogram("small_histogram", 0.0001);
+    }
+
+    #[test]
+    fn test_define_host_functions_multiple_calls() {
+        let engine = Engine::default();
+        
+        // First call should succeed
+        let mut linker1: Linker<()> = Linker::new(&engine);
+        let result1 = define_host_functions(&mut linker1);
+        assert!(result1.is_ok());
+        
+        // Second call on new linker should also succeed
+        let mut linker2: Linker<()> = Linker::new(&engine);
+        let result2 = define_host_functions(&mut linker2);
+        assert!(result2.is_ok());
+    }
+
+    #[test]
+    fn test_host_log_all_levels() {
+        // Test all valid levels
+        HostFunctions::host_log(0, "Debug");
+        HostFunctions::host_log(1, "Info");
+        HostFunctions::host_log(2, "Warn");
+        HostFunctions::host_log(3, "Error");
+        
+        // Test boundary levels
+        HostFunctions::host_log(-1, "Negative level");
+        HostFunctions::host_log(4, "Level 4");
+        HostFunctions::host_log(100, "Large level");
+    }
+
+    #[test]
+    fn test_host_get_config_various_keys() {
+        // Test various key formats
+        assert!(HostFunctions::host_get_config("simple").is_none());
+        assert!(HostFunctions::host_get_config("key.with.dots").is_none());
+        assert!(HostFunctions::host_get_config("key-with-dashes").is_none());
+        assert!(HostFunctions::host_get_config("key_with_underscores").is_none());
+        assert!(HostFunctions::host_get_config("123numeric").is_none());
+        assert!(HostFunctions::host_get_config("UPPERCASE").is_none());
+        assert!(HostFunctions::host_get_config("mixedCase").is_none());
+    }
+
+    #[test]
+    fn test_host_set_header_various_names() {
+        HostFunctions::host_set_header("X-Custom", "value");
+        HostFunctions::host_set_header("X-Custom-Header", "value");
+        HostFunctions::host_set_header("X-Custom_Header", "value");
+        HostFunctions::host_set_header("Custom", "value");
+        HostFunctions::host_set_header("content-type", "application/json");
+        HostFunctions::host_set_header("Authorization", "Bearer token");
+    }
+
+    #[test]
+    fn test_host_set_header_various_values() {
+        HostFunctions::host_set_header("X-Test", "simple");
+        HostFunctions::host_set_header("X-Test", "with spaces");
+        HostFunctions::host_set_header("X-Test", "with,commas");
+        HostFunctions::host_set_header("X-Test", "with;semicolons");
+        HostFunctions::host_set_header("X-Test", "with=equals");
+        HostFunctions::host_set_header("X-Test", "");
+    }
+
+    #[test]
+    fn test_host_metrics_various_names() {
+        let names = vec![
+            "simple",
+            "with_dots",
+            "with-dashes",
+            "with/slashes",
+            "with:colons",
+            "request_count",
+            "response_time_ms",
+            "cache.hit_ratio",
+        ];
+        
+        for name in names {
+            HostFunctions::host_metrics_counter(name, 1.0);
+            HostFunctions::host_metrics_gauge(name, 1.0);
+            HostFunctions::host_metrics_histogram(name, 1.0);
         }
+    }
+
+    #[test]
+    fn test_host_metrics_various_values() {
+        // Test integer values
+        HostFunctions::host_metrics_counter("test", 0.0);
+        HostFunctions::host_metrics_counter("test", 1.0);
+        HostFunctions::host_metrics_counter("test", 100.0);
+        HostFunctions::host_metrics_counter("test", 1000000.0);
+        
+        // Test decimal values
+        HostFunctions::host_metrics_gauge("test", 0.5);
+        HostFunctions::host_metrics_gauge("test", 1.5);
+        HostFunctions::host_metrics_gauge("test", 99.99);
+        
+        // Test negative values
+        HostFunctions::host_metrics_gauge("test", -1.0);
+        HostFunctions::host_metrics_gauge("test", -100.5);
+        
+        // Test very small values
+        HostFunctions::host_metrics_histogram("test", 0.001);
+        HostFunctions::host_metrics_histogram("test", 0.00001);
+        
+        // Test very large values
+        HostFunctions::host_metrics_histogram("test", 1000000000.0);
+    }
+
+    #[test]
+    fn test_host_functions_concurrent_calls() {
+        use std::sync::Arc;
+        use std::thread;
+        
+        let handles: Vec<_> = (0..10)
+            .map(|i| {
+                thread::spawn(move || {
+                    HostFunctions::host_log(1, &format!("Thread {} message", i));
+                    HostFunctions::host_metrics_counter("thread_counter", i as f64);
+                    HostFunctions::host_metrics_gauge("thread_gauge", i as f64);
+                })
+            })
+            .collect();
+        
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn test_define_host_functions_with_state() {
+        let engine = Engine::default();
+        
+        // Test with i32 state
+        let mut linker1: Linker<i32> = Linker::new(&engine);
+        let result1 = define_host_functions(&mut linker1);
+        assert!(result1.is_ok());
+        
+        // Test with String state
+        let mut linker2: Linker<String> = Linker::new(&engine);
+        let result2 = define_host_functions(&mut linker2);
+        assert!(result2.is_ok());
+        
+        // Test with () state
+        let mut linker3: Linker<()> = Linker::new(&engine);
+        let result3 = define_host_functions(&mut linker3);
+        assert!(result3.is_ok());
     }
 }

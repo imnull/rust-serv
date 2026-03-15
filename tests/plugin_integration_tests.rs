@@ -429,4 +429,523 @@ mod plugin_integration_tests {
 
         assert!(matches!(action, PluginAction::Continue));
     }
-}
+
+    #[tokio::test]
+    async fn test_plugin_with_disabled_manager() {
+        use rust_serv::plugin::manager::PluginManagerConfig;
+        
+        // Create manager with plugin system disabled
+        let config = PluginManagerConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        
+        let manager = Arc::new(RwLock::new(
+            PluginManager::with_config(config).expect("Failed to create manager")
+        ));
+
+        // Try to load plugin - should fail
+        let temp_file = create_temp_wasm_file();
+        let result = {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+        };
+        
+        assert!(result.is_err());
+        
+        // Requests should still pass through
+        let mut request = PluginRequest {
+            method: "GET".to_string(),
+            path: "/".to_string(),
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            body: None,
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "test".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+
+        let mut mgr = manager.write().await;
+        let action = mgr.on_request(&mut request).expect("Request processing failed");
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[tokio::test]
+    async fn test_plugin_multiple_reload_cycles() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        // Load plugin
+        let temp_file = create_temp_wasm_file();
+        let plugin_id = {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin")
+        };
+
+        // Multiple reload cycles
+        for i in 0..5 {
+            // Make a request
+            let mut request = PluginRequest {
+                method: "GET".to_string(),
+                path: format!("/test/{}", i),
+                query: HashMap::new(),
+                headers: HashMap::new(),
+                body: None,
+                client_ip: "127.0.0.1".to_string(),
+                request_id: format!("req-{}", i),
+                version: "HTTP/1.1".to_string(),
+                host: "localhost".to_string(),
+            };
+
+            {
+                let mut mgr = manager.write().await;
+                mgr.on_request(&mut request).ok();
+            }
+
+            // Reload
+            {
+                let mut mgr = manager.write().await;
+                mgr.reload(&plugin_id).expect("Failed to reload plugin");
+            }
+        }
+
+        // Verify plugin still exists
+        let mgr = manager.read().await;
+        assert_eq!(mgr.count(), 1);
+        assert!(mgr.get(&plugin_id).is_some());
+    }
+
+    #[tokio::test]
+    async fn test_plugin_request_with_various_methods() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin");
+        }
+
+        let methods = vec!["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
+        
+        for method in methods {
+            let mut request = PluginRequest {
+                method: method.to_string(),
+                path: "/api/test".to_string(),
+                query: HashMap::new(),
+                headers: HashMap::new(),
+                body: if method == "POST" || method == "PUT" {
+                    Some("body".to_string())
+                } else {
+                    None
+                },
+                client_ip: "127.0.0.1".to_string(),
+                request_id: format!("test-{}", method),
+                version: "HTTP/1.1".to_string(),
+                host: "localhost".to_string(),
+            };
+
+            let mut mgr = manager.write().await;
+            let action = mgr.on_request(&mut request)
+                .expect(&format!("Failed for method {}", method));
+            assert!(matches!(action, PluginAction::Continue));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_plugin_response_with_various_status_codes() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin");
+        }
+
+        let status_codes = vec![200, 201, 204, 301, 302, 400, 401, 403, 404, 500, 502, 503];
+        
+        for status in status_codes {
+            let mut response = PluginResponse {
+                status,
+                headers: HashMap::new(),
+                body: Some(format!("Response for status {}", status)),
+            };
+
+            let mut mgr = manager.write().await;
+            let action = mgr.on_response(&mut response)
+                .expect(&format!("Failed for status {}", status));
+            assert!(matches!(action, PluginAction::Continue));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_plugin_with_custom_config_values() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        
+        // Create config with custom values
+        let mut config = PluginConfig::default();
+        config.enabled = true;
+        config.priority = Some(500);
+        config.timeout_ms = Some(200);
+        config.custom.insert("key1".to_string(), serde_json::json!("value1"));
+        config.custom.insert("key2".to_string(), serde_json::json!(42));
+
+        let plugin_id = {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), config)
+                .expect("Failed to load plugin")
+        };
+
+        // Verify config was stored
+        let mgr = manager.read().await;
+        let plugin = mgr.get(&plugin_id).unwrap();
+        assert!(plugin.config.enabled);
+        assert_eq!(plugin.config.priority, Some(500));
+        assert_eq!(plugin.config.timeout_ms, Some(200));
+        assert_eq!(plugin.config.custom.get("key1"), Some(&serde_json::json!("value1")));
+        assert_eq!(plugin.config.custom.get("key2"), Some(&serde_json::json!(42)));
+    }
+
+    #[tokio::test]
+    async fn test_plugin_load_invalid_wasm() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        // Create temp file with invalid Wasm bytes
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        temp_file.write_all(b"invalid wasm bytes").expect("Failed to write");
+
+        let result = {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+        };
+
+        // Should fail to load invalid Wasm
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_plugin_concurrent_load_and_request() {
+        use std::io::Write;
+
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+
+        // Spawn tasks that load plugins
+        let mut load_handles = vec![];
+        for i in 0..3 {
+            let manager_clone = Arc::clone(&manager);
+            let temp_dir_path = temp_dir.path().to_path_buf();
+            
+            let handle = tokio::spawn(async move {
+                let wasm = create_test_wasm();
+                let path = temp_dir_path.join(format!("plugin{}.wasm", i));
+                let mut file = std::fs::File::create(&path).expect("Failed to create file");
+                file.write_all(&wasm).expect("Failed to write wasm");
+                
+                let mut mgr = manager_clone.write().await;
+                mgr.load(&path, PluginConfig::default())
+            });
+            load_handles.push(handle);
+        }
+
+        // Wait for all loads to complete
+        for handle in load_handles {
+            let _ = handle.await.expect("Task panicked");
+        }
+
+        // Verify all plugins loaded
+        let mgr = manager.read().await;
+        assert!(mgr.count() > 0);
+    }
+
+    #[tokio::test]
+    async fn test_plugin_list_consistency() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        let plugin_id = {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin")
+        };
+
+        // List should return consistent results
+        for _ in 0..10 {
+            let mgr = manager.read().await;
+            let plugins = mgr.list();
+            assert_eq!(plugins.len(), 1);
+            assert_eq!(plugins.first().unwrap().id, plugin_id);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_plugin_get_consistency() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        let plugin_id = {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin")
+        };
+
+        // Get should return consistent results
+        for _ in 0..10 {
+            let mgr = manager.read().await;
+            let plugin = mgr.get(&plugin_id);
+            assert!(plugin.is_some());
+            assert_eq!(plugin.unwrap().id, plugin_id);
+        }
+
+        // Non-existent plugin should return None
+        let mgr = manager.read().await;
+        assert!(mgr.get("non-existent-id").is_none());
+    }
+
+    #[tokio::test]
+    async fn test_plugin_stats_accumulation() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        let plugin_id = {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin")
+        };
+
+        // Make multiple requests
+        for i in 0..50 {
+            let mut request = PluginRequest {
+                method: "GET".to_string(),
+                path: format!("/test/{}", i),
+                query: HashMap::new(),
+                headers: HashMap::new(),
+                body: None,
+                client_ip: "127.0.0.1".to_string(),
+                request_id: format!("req-{}", i),
+                version: "HTTP/1.1".to_string(),
+                host: "localhost".to_string(),
+            };
+
+            let mut mgr = manager.write().await;
+            mgr.on_request(&mut request).ok();
+        }
+
+        // Verify stats accumulated
+        let mgr = manager.read().await;
+        let plugin = mgr.get(&plugin_id).unwrap();
+        assert!(plugin.stats.request_count >= 50);
+    }
+
+    #[tokio::test]
+    async fn test_plugin_with_empty_request_body() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin");
+        }
+
+        let mut request = PluginRequest {
+            method: "POST".to_string(),
+            path: "/api/empty".to_string(),
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            body: None,
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "empty-body-test".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+
+        let mut mgr = manager.write().await;
+        let action = mgr.on_request(&mut request)
+            .expect("Request processing failed");
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[tokio::test]
+    async fn test_plugin_with_large_request_body() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin");
+        }
+
+        let mut request = PluginRequest {
+            method: "POST".to_string(),
+            path: "/api/upload".to_string(),
+            query: HashMap::new(),
+            headers: [("content-type".to_string(), "application/octet-stream".to_string())].into_iter().collect(),
+            body: Some("x".repeat(10000)), // 10KB body
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "large-body-test".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+
+        let mut mgr = manager.write().await;
+        let action = mgr.on_request(&mut request)
+            .expect("Request processing failed");
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[tokio::test]
+    async fn test_plugin_with_many_headers() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin");
+        }
+
+        let mut headers = HashMap::new();
+        for i in 0..20 {
+            headers.insert(format!("X-Header-{}", i), format!("value-{}", i));
+        }
+
+        let mut request = PluginRequest {
+            method: "GET".to_string(),
+            path: "/api/headers".to_string(),
+            query: HashMap::new(),
+            headers,
+            body: None,
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "many-headers-test".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+
+        let mut mgr = manager.write().await;
+        let action = mgr.on_request(&mut request)
+            .expect("Request processing failed");
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[tokio::test]
+    async fn test_plugin_with_many_query_params() {
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_file = create_temp_wasm_file();
+        {
+            let mut mgr = manager.write().await;
+            mgr.load(temp_file.path(), PluginConfig::default())
+                .expect("Failed to load plugin");
+        }
+
+        let mut query = HashMap::new();
+        for i in 0..10 {
+            query.insert(format!("param{}", i), format!("value{}", i));
+        }
+
+        let mut request = PluginRequest {
+            method: "GET".to_string(),
+            path: "/api/search".to_string(),
+            query,
+            headers: HashMap::new(),
+            body: None,
+            client_ip: "127.0.0.1".to_string(),
+            request_id: "many-params-test".to_string(),
+            version: "HTTP/1.1".to_string(),
+            host: "localhost".to_string(),
+        };
+
+        let mut mgr = manager.write().await;
+        let action = mgr.on_request(&mut request)
+            .expect("Request processing failed");
+        assert!(matches!(action, PluginAction::Continue));
+    }
+
+    #[tokio::test]
+    async fn test_plugin_priority_zero() {
+        use std::io::Write;
+
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+
+        // Load plugin with priority 0
+        let wasm = create_test_wasm();
+        let path = temp_dir.path().join("plugin_priority_0.wasm");
+        let mut file = std::fs::File::create(&path).expect("Failed to create file");
+        file.write_all(&wasm).expect("Failed to write wasm");
+
+        let mut config = PluginConfig::default();
+        config.priority = Some(0);
+
+        let mut mgr = manager.write().await;
+        mgr.load(&path, config)
+            .expect("Failed to load plugin with priority 0");
+
+        let plugins = mgr.list();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins.first().unwrap().config.priority, Some(0));
+    }
+
+    #[tokio::test]
+    async fn test_plugin_priority_negative() {
+        use std::io::Write;
+
+        let manager = Arc::new(RwLock::new(
+            PluginManager::new().expect("Failed to create manager")
+        ));
+
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+
+        // Load plugin with negative priority
+        let wasm = create_test_wasm();
+        let path = temp_dir.path().join("plugin_priority_neg.wasm");
+        let mut file = std::fs::File::create(&path).expect("Failed to create file");
+        file.write_all(&wasm).expect("Failed to write wasm");
+
+        let mut config = PluginConfig::default();
+        config.priority = Some(-100);
+
+        let mut mgr = manager.write().await;
+        mgr.load(&path, config)
+            .expect("Failed to load plugin with negative priority");
+
+        let plugins = mgr.list();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins.first().unwrap().config.priority, Some(-100));
+    }}
